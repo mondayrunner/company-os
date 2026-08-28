@@ -1,56 +1,56 @@
 import process from 'node:process';globalThis._importMeta_={url:import.meta.url,env:process.env};import { tmpdir } from 'node:os';
-import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, createError, sendRedirect, proxyRequest, getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, appendResponseHeader, getRequestURL, getResponseHeader, removeResponseHeader, getQuery as getQuery$1, getRequestWebStream, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, getRouterParam, readBody, getResponseStatusText } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/h3/dist/index.mjs';
+import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, createError, sendRedirect, proxyRequest, getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, appendResponseHeader, getRequestURL, getResponseHeader, removeResponseHeader, getQuery as getQuery$1, getRequestWebStream, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, getRouterParam, readBody, getResponseStatusText } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/h3/dist/index.mjs';
 import { Server } from 'node:http';
 import { resolve, dirname, join } from 'node:path';
 import nodeCrypto from 'node:crypto';
 import { parentPort, threadId } from 'node:worker_threads';
-import { escapeHtml } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/@vue/shared/dist/shared.cjs.js';
-import viteNodeEntry_mjs from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/@nuxt/vite-builder/dist/vite-node-entry.mjs';
-import { viteNodeFetch } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/@nuxt/vite-builder/dist/vite-node.mjs';
-import { listItems } from 'file:///Users/timvandenbosch/Sites/brainlane/core//inbox.mjs';
+import { escapeHtml } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/@vue/shared/dist/shared.cjs.js';
+import viteNodeEntry_mjs from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/@nuxt/vite-builder/dist/vite-node-entry.mjs';
+import { viteNodeFetch } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/@nuxt/vite-builder/dist/vite-node.mjs';
+import { listItems } from 'file:///Users/timvandenbosch/Sites/company-os-engine/core//inbox.mjs';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { listJobs } from 'file:///Users/timvandenbosch/Sites/brainlane/core//jobs.mjs';
+import { listJobs } from 'file:///Users/timvandenbosch/Sites/company-os-engine/core//jobs.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { promises, existsSync } from 'node:fs';
-import { byKind, loadConnectors } from 'file:///Users/timvandenbosch/Sites/brainlane/core//connectors.mjs';
+import { byKind, loadConnectors } from 'file:///Users/timvandenbosch/Sites/company-os-engine/core//connectors.mjs';
 import { readFile } from 'node:fs/promises';
-import { loadContext } from 'file:///Users/timvandenbosch/Sites/brainlane/core//config.mjs';
-import { parseURL, withoutBase, joinURL, getQuery, withQuery, withTrailingSlash, decodePath, withLeadingSlash, withoutTrailingSlash, encodePath, joinRelativeURL } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/ufo/dist/index.mjs';
-import destr, { destr as destr$1 } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/destr/dist/index.mjs';
-import { createHooks } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/nitropack/node_modules/hookable/dist/index.mjs';
-import { createFetch, Headers as Headers$1 } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/ofetch/dist/node.mjs';
-import { fetchNodeRequestHandler, callNodeRequestHandler } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/node-mock-http/dist/index.mjs';
-import { createStorage, prefixStorage } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/unstorage/dist/index.mjs';
-import unstorage_47drivers_47fs from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/unstorage/drivers/fs.mjs';
-import { digest, hash as hash$1 } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/ohash/dist/index.mjs';
-import { klona } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/klona/dist/index.mjs';
-import defu, { defuFn } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/defu/dist/defu.mjs';
-import { snakeCase } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/scule/dist/index.mjs';
-import { getContext } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/nitropack/node_modules/unctx/dist/index.mjs';
-import { toRouteMatcher, createRouter } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/radix3/dist/index.mjs';
-import consola, { consola as consola$1 } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/consola/dist/index.mjs';
-import { ErrorParser } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/youch-core/build/index.js';
-import { Youch } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/youch/build/index.js';
-import { SourceMapConsumer } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/source-map/source-map.js';
-import { defineDiagnostics, createConsoleReporter } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/nostics/dist/index.mjs';
-import { ansiFormatter } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/nostics/dist/formatters/ansi.mjs';
+import { loadContext } from 'file:///Users/timvandenbosch/Sites/company-os-engine/core//config.mjs';
+import { parseURL, withoutBase, joinURL, getQuery, withQuery, withTrailingSlash, decodePath, withLeadingSlash, withoutTrailingSlash, encodePath, joinRelativeURL } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/ufo/dist/index.mjs';
+import destr, { destr as destr$1 } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/destr/dist/index.mjs';
+import { createHooks } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/nitropack/node_modules/hookable/dist/index.mjs';
+import { createFetch, Headers as Headers$1 } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/ofetch/dist/node.mjs';
+import { fetchNodeRequestHandler, callNodeRequestHandler } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/node-mock-http/dist/index.mjs';
+import { createStorage, prefixStorage } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/unstorage/dist/index.mjs';
+import unstorage_47drivers_47fs from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/unstorage/drivers/fs.mjs';
+import { digest, hash as hash$1 } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/ohash/dist/index.mjs';
+import { klona } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/klona/dist/index.mjs';
+import defu, { defuFn } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/defu/dist/defu.mjs';
+import { snakeCase } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/scule/dist/index.mjs';
+import { getContext } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/nitropack/node_modules/unctx/dist/index.mjs';
+import { toRouteMatcher, createRouter } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/radix3/dist/index.mjs';
+import consola, { consola as consola$1 } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/consola/dist/index.mjs';
+import { ErrorParser } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/youch-core/build/index.js';
+import { Youch } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/youch/build/index.js';
+import { SourceMapConsumer } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/source-map/source-map.js';
+import { defineDiagnostics, createConsoleReporter } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/nostics/dist/index.mjs';
+import { ansiFormatter } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/nostics/dist/formatters/ansi.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { stringify, uneval } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/devalue/index.js';
-import { getContext as getContext$1 } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/unctx/dist/index.mjs';
-import { captureRawStackTrace, parseRawStackTrace } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/errx/dist/index.mjs';
-import { isVNode, isRef, toValue } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/vue/index.mjs';
-import _wH6JrtIxmaSoA8lCPWFnE9z4lQeXW6H5z3l5aymEQw from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/@nuxt/vite-builder/dist/fix-stacktrace.mjs';
+import { stringify, uneval } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/devalue/index.js';
+import { getContext as getContext$1 } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/unctx/dist/index.mjs';
+import { captureRawStackTrace, parseRawStackTrace } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/errx/dist/index.mjs';
+import { isVNode, isRef, toValue } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/vue/index.mjs';
+import _wH6JrtIxmaSoA8lCPWFnE9z4lQeXW6H5z3l5aymEQw from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/@nuxt/vite-builder/dist/fix-stacktrace.mjs';
 import { fileURLToPath } from 'node:url';
-import { dirname as dirname$1, resolve as resolve$1 } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/pathe/dist/index.mjs';
-import { createRenderer, getRequestDependencies, getPreloadLinks, getPrefetchLinks } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/vue-bundle-renderer/dist/runtime.mjs';
-import { renderToString } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/vue/server-renderer/index.mjs';
-import { createHead as createHead$1, propsToString, renderSSRHead } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/unhead/dist/server.mjs';
-import { walkResolver } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/unhead/dist/utils.mjs';
-import { DeprecationsPlugin } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/unhead/dist/legacy.mjs';
-import { PromisesPlugin, TemplateParamsPlugin, AliasSortingPlugin } from 'file:///Users/timvandenbosch/Sites/brainlane/ui/node_modules/unhead/dist/plugins.mjs';
+import { dirname as dirname$1, resolve as resolve$1 } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/pathe/dist/index.mjs';
+import { createRenderer, getRequestDependencies, getPreloadLinks, getPrefetchLinks } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/vue-bundle-renderer/dist/runtime.mjs';
+import { renderToString } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/vue/server-renderer/index.mjs';
+import { createHead as createHead$1, propsToString, renderSSRHead } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/unhead/dist/server.mjs';
+import { walkResolver } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/unhead/dist/utils.mjs';
+import { DeprecationsPlugin } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/unhead/dist/legacy.mjs';
+import { PromisesPlugin, TemplateParamsPlugin, AliasSortingPlugin } from 'file:///Users/timvandenbosch/Sites/company-os-engine/ui/node_modules/unhead/dist/plugins.mjs';
 
-const serverAssets = [{"baseName":"server","dir":"/Users/timvandenbosch/Sites/brainlane/ui/server/assets"}];
+const serverAssets = [{"baseName":"server","dir":"/Users/timvandenbosch/Sites/company-os-engine/ui/server/assets"}];
 
 const assets$1 = createStorage();
 
@@ -62,11 +62,11 @@ const storage = createStorage({});
 
 storage.mount('/assets', assets$1);
 
-storage.mount('root', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"/Users/timvandenbosch/Sites/brainlane/ui","watchOptions":{"ignored":[null]}}));
-storage.mount('src', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"/Users/timvandenbosch/Sites/brainlane/ui/server","watchOptions":{"ignored":[null]}}));
-storage.mount('build', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"/Users/timvandenbosch/Sites/brainlane/ui/.nuxt"}));
-storage.mount('cache', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"/Users/timvandenbosch/Sites/brainlane/ui/.nuxt/cache"}));
-storage.mount('data', unstorage_47drivers_47fs({"driver":"fs","base":"/Users/timvandenbosch/Sites/brainlane/ui/.data/kv"}));
+storage.mount('root', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"/Users/timvandenbosch/Sites/company-os-engine/ui","watchOptions":{"ignored":[null]}}));
+storage.mount('src', unstorage_47drivers_47fs({"driver":"fs","readOnly":true,"base":"/Users/timvandenbosch/Sites/company-os-engine/ui/server","watchOptions":{"ignored":[null]}}));
+storage.mount('build', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"/Users/timvandenbosch/Sites/company-os-engine/ui/.nuxt"}));
+storage.mount('cache', unstorage_47drivers_47fs({"driver":"fs","readOnly":false,"base":"/Users/timvandenbosch/Sites/company-os-engine/ui/.nuxt/cache"}));
+storage.mount('data', unstorage_47drivers_47fs({"driver":"fs","base":"/Users/timvandenbosch/Sites/company-os-engine/ui/.data/kv"}));
 
 function useStorage(base = "") {
   return base ? prefixStorage(storage, base) : storage;
@@ -2071,7 +2071,7 @@ const serverDiagnostics = /* #__PURE__ */ defineDiagnostics({
 	}
 });
 
-const appHead = {"meta":[{"name":"viewport","content":"width=device-width, initial-scale=1"},{"charset":"utf-8"},{"name":"color-scheme","content":"light dark"}],"link":[],"style":[],"script":[],"noscript":[],"title":"brainlane"};
+const appHead = {"meta":[{"name":"viewport","content":"width=device-width, initial-scale=1"},{"charset":"utf-8"},{"name":"color-scheme","content":"light dark"}],"link":[],"style":[],"script":[],"noscript":[],"title":"company-os"};
 
 const appRootTag = "div";
 
@@ -2087,7 +2087,7 @@ const appSpaLoaderAttrs = {"id":"__nuxt-loader"};
 
 const appId = "nuxt-app";
 
-const rootDir = "/Users/timvandenbosch/Sites/brainlane/ui";
+const rootDir = "/Users/timvandenbosch/Sites/company-os-engine/ui";
 
 //#region src/runtime/plugins/dev-server-logs.ts
 const devReducers = {
@@ -2193,7 +2193,7 @@ function getAsset (id) {
 
 const METHODS = /* @__PURE__ */ new Set(["HEAD", "GET"]);
 const EncodingMap = { gzip: ".gz", br: ".br" };
-const _Cv8S_z = eventHandler((event) => {
+const _RVutww = eventHandler((event) => {
   if (event.method && !METHODS.has(event.method)) {
     return;
   }
@@ -2768,39 +2768,39 @@ async function getIslandContext(event) {
 	};
 }
 
-const _lazy_Wbq6s_ = () => Promise.resolve().then(function () { return ask_post$1; });
-const _lazy_Nx_6IO = () => Promise.resolve().then(function () { return brain_get$1; });
-const _lazy_SnUpcP = () => Promise.resolve().then(function () { return calendar_get$1; });
-const _lazy_o5V8D5 = () => Promise.resolve().then(function () { return config_get$1; });
-const _lazy_UzFXdM = () => Promise.resolve().then(function () { return finance_get$1; });
-const _lazy_8nOTV3 = () => Promise.resolve().then(function () { return inbox_get$1; });
-const _lazy_16OdVv = () => Promise.resolve().then(function () { return inbox_post$1; });
-const _lazy_XcyTMI = () => Promise.resolve().then(function () { return kickstart_post$1; });
-const _lazy_S8E27P = () => Promise.resolve().then(function () { return mail_get$1; });
-const _lazy_OKuVLk = () => Promise.resolve().then(function () { return metrics_get$1; });
-const _lazy_OqHeMy = () => Promise.resolve().then(function () { return modules_get$1; });
-const _lazy_tMK63O = () => Promise.resolve().then(function () { return system_get$1; });
-const _lazy_Xobuf2 = () => Promise.resolve().then(function () { return tasks_get$1; });
-const _lazy_UiizlZ = () => Promise.resolve().then(function () { return renderer; });
+const _lazy_j037PD = () => Promise.resolve().then(function () { return ask_post$1; });
+const _lazy_ZjFSU0 = () => Promise.resolve().then(function () { return brain_get$1; });
+const _lazy_Y6hHpF = () => Promise.resolve().then(function () { return calendar_get$1; });
+const _lazy_BZUbaH = () => Promise.resolve().then(function () { return config_get$1; });
+const _lazy_jZgUXY = () => Promise.resolve().then(function () { return finance_get$1; });
+const _lazy_DDnnCH = () => Promise.resolve().then(function () { return inbox_get$1; });
+const _lazy_qwk_r0 = () => Promise.resolve().then(function () { return inbox_post$1; });
+const _lazy_d7c8wM = () => Promise.resolve().then(function () { return kickstart_post$1; });
+const _lazy_diLtaO = () => Promise.resolve().then(function () { return mail_get$1; });
+const _lazy_Yk9QCW = () => Promise.resolve().then(function () { return metrics_get$1; });
+const _lazy_NFrFgD = () => Promise.resolve().then(function () { return modules_get$1; });
+const _lazy_fygaeD = () => Promise.resolve().then(function () { return system_get$1; });
+const _lazy_OcNA8v = () => Promise.resolve().then(function () { return tasks_get$1; });
+const _lazy_iYYX15 = () => Promise.resolve().then(function () { return renderer; });
 
 const handlers = [
-  { route: '', handler: _Cv8S_z, lazy: false, middleware: true, method: undefined },
-  { route: '/api/ask', handler: _lazy_Wbq6s_, lazy: true, middleware: false, method: "post" },
-  { route: '/api/brain', handler: _lazy_Nx_6IO, lazy: true, middleware: false, method: "get" },
-  { route: '/api/calendar', handler: _lazy_SnUpcP, lazy: true, middleware: false, method: "get" },
-  { route: '/api/config', handler: _lazy_o5V8D5, lazy: true, middleware: false, method: "get" },
-  { route: '/api/finance', handler: _lazy_UzFXdM, lazy: true, middleware: false, method: "get" },
-  { route: '/api/inbox', handler: _lazy_8nOTV3, lazy: true, middleware: false, method: "get" },
-  { route: '/api/inbox', handler: _lazy_16OdVv, lazy: true, middleware: false, method: "post" },
-  { route: '/api/kickstart', handler: _lazy_XcyTMI, lazy: true, middleware: false, method: "post" },
-  { route: '/api/mail', handler: _lazy_S8E27P, lazy: true, middleware: false, method: "get" },
-  { route: '/api/metrics', handler: _lazy_OKuVLk, lazy: true, middleware: false, method: "get" },
-  { route: '/api/modules', handler: _lazy_OqHeMy, lazy: true, middleware: false, method: "get" },
-  { route: '/api/system', handler: _lazy_tMK63O, lazy: true, middleware: false, method: "get" },
-  { route: '/api/tasks', handler: _lazy_Xobuf2, lazy: true, middleware: false, method: "get" },
-  { route: '/__nuxt_error', handler: _lazy_UiizlZ, lazy: true, middleware: false, method: undefined },
+  { route: '', handler: _RVutww, lazy: false, middleware: true, method: undefined },
+  { route: '/api/ask', handler: _lazy_j037PD, lazy: true, middleware: false, method: "post" },
+  { route: '/api/brain', handler: _lazy_ZjFSU0, lazy: true, middleware: false, method: "get" },
+  { route: '/api/calendar', handler: _lazy_Y6hHpF, lazy: true, middleware: false, method: "get" },
+  { route: '/api/config', handler: _lazy_BZUbaH, lazy: true, middleware: false, method: "get" },
+  { route: '/api/finance', handler: _lazy_jZgUXY, lazy: true, middleware: false, method: "get" },
+  { route: '/api/inbox', handler: _lazy_DDnnCH, lazy: true, middleware: false, method: "get" },
+  { route: '/api/inbox', handler: _lazy_qwk_r0, lazy: true, middleware: false, method: "post" },
+  { route: '/api/kickstart', handler: _lazy_d7c8wM, lazy: true, middleware: false, method: "post" },
+  { route: '/api/mail', handler: _lazy_diLtaO, lazy: true, middleware: false, method: "get" },
+  { route: '/api/metrics', handler: _lazy_Yk9QCW, lazy: true, middleware: false, method: "get" },
+  { route: '/api/modules', handler: _lazy_NFrFgD, lazy: true, middleware: false, method: "get" },
+  { route: '/api/system', handler: _lazy_fygaeD, lazy: true, middleware: false, method: "get" },
+  { route: '/api/tasks', handler: _lazy_OcNA8v, lazy: true, middleware: false, method: "get" },
+  { route: '/__nuxt_error', handler: _lazy_iYYX15, lazy: true, middleware: false, method: undefined },
   { route: '/__nuxt_island/**', handler: handler$1, lazy: false, middleware: false, method: undefined },
-  { route: '/**', handler: _lazy_UiizlZ, lazy: true, middleware: false, method: undefined }
+  { route: '/**', handler: _lazy_iYYX15, lazy: true, middleware: false, method: undefined }
 ];
 
 function createNitroApp() {
@@ -3155,7 +3155,7 @@ const styles$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
 
 let cached = null;
 function ctx() {
-  if (!cached) cached = loadContext({ root: process.env.BRAINLANE_ROOT });
+  if (!cached) cached = loadContext({ root: process.env.COMPANY_OS_ROOT });
   return cached;
 }
 function publicConfig() {
@@ -3166,7 +3166,7 @@ function publicConfig() {
     name: c.config.name,
     language: c.config.language,
     locale: (_b = { nl: "nl-NL", en: "en-GB", de: "de-DE", fr: "fr-FR", es: "es-ES" }[c.config.language]) != null ? _b : "en-GB",
-    title: (_c = ui.title) != null ? _c : "brainlane",
+    title: (_c = ui.title) != null ? _c : "company-os",
     logo: (_d = ui.logo) != null ? _d : null,
     nav: (_e = ui.nav) != null ? _e : [],
     examples: (_f = ui.examples) != null ? _f : []
@@ -3175,8 +3175,8 @@ function publicConfig() {
 
 const exec = promisify(execFile);
 async function cli(args, timeoutMs = 3e5) {
-  const bin = join(ctx().lib, "bin", "brainlane.mjs");
-  const { stdout } = await exec(process.execPath, [bin, ...args], { cwd: ctx().root, timeout: timeoutMs, maxBuffer: 20 * 1024 * 1024, env: { ...process.env, BRAINLANE_ROOT: ctx().root } });
+  const bin = join(ctx().lib, "bin", "company-os.mjs");
+  const { stdout } = await exec(process.execPath, [bin, ...args], { cwd: ctx().root, timeout: timeoutMs, maxBuffer: 20 * 1024 * 1024, env: { ...process.env, COMPANY_OS_ROOT: ctx().root } });
   const start = stdout.search(/[[{]/);
   return start >= 0 ? JSON.parse(stdout.slice(start)) : null;
 }
@@ -3360,7 +3360,7 @@ const kickstart_post = defineEventHandler(async (event) => {
     setResponseStatus(event, 400);
     return { ok: false, error: `unknown job: ${name}` };
   }
-  const p = spawn(process.execPath, [join(ctx().lib, "bin", "brainlane.mjs"), "jobs", "run", name], { cwd: ctx().root, detached: true, stdio: "ignore", env: { ...process.env, BRAINLANE_ROOT: ctx().root } });
+  const p = spawn(process.execPath, [join(ctx().lib, "bin", "company-os.mjs"), "jobs", "run", name], { cwd: ctx().root, detached: true, stdio: "ignore", env: { ...process.env, COMPANY_OS_ROOT: ctx().root } });
   p.unref();
   return { ok: true, name, started: (/* @__PURE__ */ new Date()).toISOString() };
 });

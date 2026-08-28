@@ -49,3 +49,15 @@ test("knowledge-frontmatter: stale last_verified", () => assert.ok(has("knowledg
 test("wikilinks: dead [[positioning]]", () => assert.ok(has("wikilinks", "positioning")));
 test("doc-paths: dead playbook path", () => assert.ok(has("doc-paths", "playbooks/sales.md")));
 test("subscriptions check skipped without a finance connector", () => assert.ok(result.skipped.some((s) => s.check === "subscriptions-vs-accounts")));
+
+test("metrics survive losing the database: written to CSV, read back on index", async () => {
+  const { writeMetrics } = await import("../core/index.mjs");
+  const { writeMetricsFile, readMetricsFile } = await import("../core/index.mjs");
+  writeMetrics(db, [{ date: "2026-01-01", key: "mrr", value: 4250 }, { date: "2026-01-02", key: "mrr", value: 4400 }]);
+  const written = await writeMetricsFile(ctx, db);
+  assert.equal(written.rows, 2);
+  db.exec("DELETE FROM metrics");
+  assert.equal(db.prepare("SELECT count(*) n FROM metrics").get().n, 0);
+  assert.equal(await readMetricsFile(ctx, db), 2);
+  assert.equal(db.prepare("SELECT value FROM metrics WHERE date='2026-01-02'").get().value, 4400);
+});
