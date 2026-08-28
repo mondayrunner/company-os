@@ -61,3 +61,12 @@ test("metrics survive losing the database: written to CSV, read back on index", 
   assert.equal(await readMetricsFile(ctx, db), 2);
   assert.equal(db.prepare("SELECT value FROM metrics WHERE date='2026-01-02'").get().value, 4400);
 });
+
+test("search: a hit in the path outranks a chatty note that repeats the word", async () => {
+  const { search } = await import("../core/search.mjs");
+  // The fixture has an Acme account folder and a pipeline log that names Acme twice.
+  const hits = search(db, "what is the state of Acme?", 5, ctx);
+  assert.ok(hits.length);
+  assert.match(hits[0].path, /acme/i);
+  assert.equal(new Set(hits.map((h) => h.path)).size, hits.length, "one hit per document");
+});

@@ -8,7 +8,9 @@ const lists = useCollapsed("task-lists")
 </script>
 
 <template>
-  <div class="p-3 grid gap-3 grid-cols-1 md:grid-cols-2 auto-rows-[20rem] xl:h-full xl:grid-cols-3 xl:auto-rows-fr xl:min-h-0">
+  <div class="h-full overflow-y-auto p-3 space-y-3">
+    <StatStrip />
+    <div class="grid gap-3 grid-cols-1 md:grid-cols-2 auto-rows-[20rem] xl:grid-cols-3">
     <Panel v-if="has('tasks')" title="Tasks" api="tasks">
       <template #head="{ data: d }">
         <Count v-if="d" :value="d.total" />
@@ -98,7 +100,7 @@ const lists = useCollapsed("task-lists")
       </template>
     </Panel>
 
-    <Panel title="Inbox" api="inbox" anchor="inbox">
+    <Panel title="Inbox" api="inbox" anchor="inbox" to="/inbox" to-label="answer">
       <template #head="{ data: d }">
         <Count v-if="d" :value="`${d.open.length} open`" :tone="d.open.length ? 'warn' : 'good'" />
         <Count v-if="d?.approved.length" :value="`${d.approved.length} approved`" />
@@ -114,5 +116,6 @@ const lists = useCollapsed("task-lists")
         </NuxtLink>
       </template>
     </Panel>
+    </div>
   </div>
 </template>

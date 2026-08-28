@@ -3,21 +3,15 @@
 // candidates, an agent reads them, live sources are fetched when the question
 // touches one. Read-only.
 const { cfg, fmt } = useConfig()
-const question = ref(""), busy = ref(false), fault = ref<string | null>(null), answer = ref<any>(null)
+const { question, busy, error: fault, answer, reading, ask: run } = useAsk()
 const history = ref<any[]>([])
 const { data: brainData } = useLazyFetch<any>("/api/brain", { server: false, key: "ask-brain" })
 const state = computed(() => (brainData.value?.ok ? brainData.value.data : null))
 
 async function ask(v?: string) {
   const q = (v ?? question.value).trim()
-  if (!q || busy.value) return
-  question.value = q; busy.value = true; fault.value = null; answer.value = null
-  try {
-    const r = await $fetch<any>("/api/ask", { method: "POST", body: { question: q } })
-    answer.value = r
-    history.value.unshift({ question: q, ts: new Date().toISOString(), found: r.found })
-  } catch (e: any) { fault.value = e?.data?.error || e?.message || "failed" }
-  finally { busy.value = false }
+  await run(q)
+  if (answer.value) history.value.unshift({ question: q, ts: new Date().toISOString(), found: answer.value.found })
 }
 </script>
 
@@ -41,18 +35,14 @@ async function ask(v?: string) {
         <button v-for="v in cfg.examples" :key="v" class="text-[11px] px-2.5 py-1 rounded-full ring-1 ring-line text-ink-3 hover:text-ink hover:ring-ink-3 transition-colors" @click="ask(v)">{{ v }}</button>
       </div>
 
-      <div v-if="busy" class="space-y-2 mb-6">
-        <div v-for="i in 6" :key="i" class="h-4 rounded bg-line-soft animate-pulse" :style="{ width: `${100 - (i % 4) * 14}%` }" />
-        <p class="text-[12px] text-ink-3">Index searched, reading files…</p>
-      </div>
+      <div v-if="busy" class="rounded-2xl ring-1 ring-line bg-card p-5 mb-6"><AskProgress :reading="reading" /></div>
       <p v-if="fault" class="text-[13px] text-red mb-4">{{ fault }}</p>
 
       <article v-if="answer" class="rounded-2xl ring-1 ring-line bg-card p-6 mb-4">
         <AnswerBody :text="answer.answer" />
-        <div class="mt-4 pt-3 border-t border-line-soft flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-3">
+        <AnswerSources :sources="answer.sources" :live="answer.live" />
+        <div class="mt-3 pt-2 border-t border-line-soft flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-3">
           <span :class="answer.found ? 'text-success' : 'text-orange'">{{ answer.found ? "found" : "not found in the brain" }}</span>
-          <span>{{ answer.sources.length }} source{{ answer.sources.length === 1 ? "" : "s" }}</span>
-          <span v-if="answer.live?.length" class="text-info">live: {{ answer.live.map((l: any) => `${l.kind} @ ${fmt.time(l.fetched)}`).join(", ") }}</span>
           <span>{{ (answer.duration / 1000).toFixed(0) }} s</span><span v-if="answer.cost != null">${{ answer.cost.toFixed(3) }}</span>
         </div>
         <details v-if="answer.candidates?.length" class="mt-2">

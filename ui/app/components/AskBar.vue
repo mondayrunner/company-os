@@ -2,7 +2,8 @@
 // Ask the brain from anywhere: a bar in the header (⌘K) that opens an overlay
 // with the answer and its sources. One field that both navigates and asks.
 const { cfg } = useConfig()
-const open = ref(false), question = ref(""), busy = ref(false), fault = ref<string | null>(null), answer = ref<any>(null)
+const open = ref(false)
+const { question, busy, error: fault, answer, reading, ask, reset } = useAsk()
 const field = ref<HTMLInputElement | null>(null)
 const router = useRouter()
 const pages = computed(() => [{ p: "/", t: "Overview" }, ...cfg.value.nav, { p: "/inbox", t: "Inbox" }, { p: "/status", t: "Status" }, { p: "/ask", t: "All questions" }])
@@ -12,14 +13,7 @@ const pageHits = computed(() => { const q = question.value.trim().toLowerCase();
 function show() { open.value = true; nextTick(() => field.value?.focus()) }
 function close() { open.value = false }
 function go(p: string) { close(); router.push(p) }
-async function ask(v?: string) {
-  const q = (v ?? question.value).trim()
-  if (q.length < 3 || busy.value) return
-  question.value = q; busy.value = true; fault.value = null; answer.value = null
-  try { answer.value = await $fetch<any>("/api/ask", { method: "POST", body: { question: q } }); refreshBrain() }
-  catch (e: any) { fault.value = e?.data?.error || e?.message || "failed" }
-  finally { busy.value = false }
-}
+watch(answer, (a) => { if (a) refreshBrain() })
 function key(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); open.value ? close() : show() }
   else if (e.key === "Escape" && open.value) close()
@@ -46,19 +40,15 @@ onBeforeUnmount(() => window.removeEventListener("keydown", key))
             <p class="text-[10px] uppercase tracking-wider text-ink-3 px-2 mb-1">Go to</p>
             <button v-for="p in pageHits" :key="p.p" class="w-full text-left text-[13px] px-2 py-1 rounded-lg hover:bg-header" @click="go(p.p)">{{ p.t }} <span class="text-ink-3 text-[11px]">{{ p.p }}</span></button>
           </div>
-          <div v-if="busy" class="px-5 py-5 space-y-2">
-            <div v-for="i in 5" :key="i" class="h-3.5 rounded bg-line-soft animate-pulse" :style="{ width: `${100 - (i % 4) * 14}%` }" />
-            <p class="text-[11px] text-ink-3 pt-1">Index searched, reading files and live sources. 20 to 90 seconds.</p>
-          </div>
+          <div v-if="busy" class="px-5 py-4"><AskProgress :reading="reading" /></div>
           <p v-else-if="fault" class="px-5 py-4 text-[13px] text-red">{{ fault }}</p>
           <div v-else-if="answer" class="px-5 py-4">
             <AnswerBody :text="answer.answer" />
+            <AnswerSources :sources="answer.sources" :live="answer.live" />
             <div class="mt-3 pt-2 border-t border-line-soft flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-3">
               <span :class="answer.found ? 'text-success' : 'text-orange'">{{ answer.found ? "found" : "not found in the brain" }}</span>
-              <span>{{ answer.sources.length }} source{{ answer.sources.length === 1 ? "" : "s" }}</span>
-              <span v-if="answer.live?.length" class="text-info">live: {{ answer.live.map((l: any) => l.kind).join(", ") }}</span>
               <span>{{ (answer.duration / 1000).toFixed(0) }} s</span><span v-if="answer.cost != null">${{ answer.cost.toFixed(2) }}</span>
-              <button class="ml-auto hover:text-ink" @click="answer = null; question = ''; field?.focus()">new question</button>
+              <button class="ml-auto hover:text-ink" @click="reset(); field?.focus()">new question</button>
             </div>
           </div>
           <div v-else class="px-2 py-2">

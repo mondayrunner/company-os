@@ -22,7 +22,7 @@ export const TOOLS = [
 
 export async function callTool(ctx, db, name, args = {}) {
   switch (name) {
-    case "search": return search(db, args.query, args.limit ?? 8);
+    case "search": return search(db, args.query, args.limit ?? 8, ctx);
     case "context": return context(db, ctx, args.account);
     case "ask": return ask(ctx, db, args.question, { askedBy: "agent" });
     case "live": {

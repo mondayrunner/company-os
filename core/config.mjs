@@ -50,6 +50,8 @@ export const DEFAULTS = {
     },
   },
   inbox: { dir: "inbox", fromChecks: true, fromLink: true },
+  // Search reranking: words to ignore, and how much each kind of document counts.
+  search: { stopwords: null, weights: {} },
   link: { namesModule: null, extraAccountDirs: [], editors: "ghostty|cursor|sublime|iterm|terminal|claude|code" },
 };
 

@@ -12,6 +12,7 @@
 //   id: 2026-08-31-check-a1b2c3d4
 //   kind: drift | proposal | link | question | report
 //   from: check | compact | link | advisors | <agent>
+//   where: sales-reviews/_pipeline/pipeline.md:3        # optional: what it is about
 //   created: 2026-08-31T08:00:00Z
 //   status: open | approved | rejected | done | failed
 //   title: …
@@ -35,7 +36,7 @@ export function parseItem(text, path) {
   const reply = body.split(/^## Reply\s*$/m)[1]?.split(/^## Result\s*$/m)[0]?.trim() ?? "";
   const result = body.split(/^## Result\s*$/m)[1]?.trim() ?? "";
   const description = body.split(/^## Reply\s*$/m)[0].trim();
-  return { id: meta.id, kind: meta.kind, from: meta.from, created: meta.created, status: meta.status ?? "open", title: meta.title, fingerprint: meta.fingerprint, action, description, reply, result, path };
+  return { id: meta.id, kind: meta.kind, from: meta.from, created: meta.created, status: meta.status ?? "open", title: meta.title, where: meta.where ?? null, fingerprint: meta.fingerprint, action, description, reply, result, path };
 }
 
 export async function listItems(ctx, { status = null } = {}) {
@@ -51,7 +52,7 @@ export async function listItems(ctx, { status = null } = {}) {
 }
 
 /** Post an item. Same fingerprint already open, approved or rejected → not posted again. */
-export async function postItem(ctx, { kind = "report", from = "agent", title, body = "", action = null, fingerprint = null }) {
+export async function postItem(ctx, { kind = "report", from = "agent", title, body = "", action = null, fingerprint = null, where = null }) {
   if (!title) throw new Error("inbox: title required");
   const fp = fingerprint ?? hashOf(`${kind}|${from}|${title}`).slice(0, 8);
   const existing = (await listItems(ctx)).find((i) => i.fingerprint === fp && ["open", "approved", "rejected"].includes(i.status));
@@ -60,7 +61,8 @@ export async function postItem(ctx, { kind = "report", from = "agent", title, bo
   await mkdir(dir, { recursive: true });
   const created = new Date().toISOString();
   const id = `${created.slice(0, 10)}-${from.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${fp}`;
-  const text = ["---", `id: ${id}`, `kind: ${kind}`, `from: ${from}`, `created: ${created}`, "status: open", `title: ${String(title).replace(/\n/g, " ")}`, `fingerprint: ${fp}`,
+  const text = ["---", `id: ${id}`, `kind: ${kind}`, `from: ${from}`, `created: ${created}`, "status: open", `title: ${String(title).replace(/\n/g, " ")}`,
+    where ? `where: ${where}` : null, `fingerprint: ${fp}`,
     action ? `action: ${JSON.stringify(action)}` : null, "---", "", body.trim(), "", "## Reply", "", ""].filter((l) => l !== null).join("\n");
   await writeFile(join(dir, `${id}.md`), text);
   return { id, created: true, status: "open" };

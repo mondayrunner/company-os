@@ -14,7 +14,7 @@ export async function ask(ctx, db, question, { askedBy = "human", n = 10 } = {})
   const q = String(question ?? "").trim();
   if (q.length < 3 || q.length > 800) throw new Error("question too short or too long");
   const t0 = Date.now();
-  const candidates = search(db, q, n);
+  const candidates = search(db, q, n, ctx);
   const list = candidates.length
     ? candidates.map((k) => `- \`${k.path}\` · ${k.heading || k.title} · ${String(k.snippet).replace(/\s+/g, " ").slice(0, 220)}`).join("\n")
     : "- (the index found nothing; search yourself with Grep/Glob)";

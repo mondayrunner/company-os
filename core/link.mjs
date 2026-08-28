@@ -94,7 +94,7 @@ export async function link(ctx, { dryRun = false } = {}) {
     out.open.push({ file: b, proposal: scores.slice(0, 3).map((s) => `${s.account} (${s.names.join("+")})`) });
     if (!dryRun && ctx.config.inbox?.fromLink !== false) {
       const rel = `${ctx.config.transcripts.inbox}/${b}`;
-      await postItem(ctx, { kind: "question", from: "link", title: `Which account does ${b} belong to?`, fingerprint: `l${hashPart(rel)}`,
+      await postItem(ctx, { kind: "question", from: "link", title: `Which account does this transcript belong to?`, where: rel, fingerprint: `l${hashPart(rel)}`,
         body: `Transcript \`${rel}\` is not linked to an account.${scores.length ? `\n\nCandidates: ${scores.slice(0, 3).map((s) => `\`${s.account}\` (${s.names.join(", ")})`).join(", ")}` : "\n\nNo account name recognised."}\n\nReply with the account path (or \`internal\`) and approve.`,
         action: { type: "set-frontmatter", file: rel, field: keys.account } });
     }

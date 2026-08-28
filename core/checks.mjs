@@ -133,7 +133,7 @@ export async function runChecks(ctx, db, { live = true, only = null } = {}) {
   let posted = 0;
   if (ctx.config.inbox?.fromChecks !== false) {
     for (const f of findings) {
-      const r = await postItem(ctx, { kind: "drift", from: "check", title: `${f.check}: ${f.where}${f.line ? `:${f.line}` : ""} — ${f.what.slice(0, 80)}`, fingerprint: hashOf(`${f.check}|${f.where}|${f.what}`).slice(0, 8),
+      const r = await postItem(ctx, { kind: "drift", from: "check", title: f.what.replace(/\n/g, " ").slice(0, 120), where: `${f.where}${f.line ? `:${f.line}` : ""}`, fingerprint: hashOf(`${f.check}|${f.where}|${f.what}`).slice(0, 8),
         body: `**${f.severity}** · check \`${f.check}\` · \`${f.where}${f.line ? `:${f.line}` : ""}\`\n\n${f.what}\n\nReply with what to do (and approve), or reject to silence this finding.`, action: f.action ?? null });
       if (r.created) posted++;
     }

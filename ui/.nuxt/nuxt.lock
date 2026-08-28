@@ -1,9 +1,0 @@
-{
-  "pid": 49832,
-  "startedAt": 1787901192318,
-  "command": "dev",
-  "cwd": "/Users/timvandenbosch/Sites/company-os-engine/ui",
-  "port": 4331,
-  "hostname": "::1",
-  "url": "http://[::1]:4331"
-}

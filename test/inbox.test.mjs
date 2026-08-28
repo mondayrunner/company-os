@@ -36,14 +36,16 @@ test("checks post drift items with a fingerprint; pipeline-freshness carries an 
   const r = await runChecks(ctx, db, { live: false });
   assert.ok(r.inbox.posted >= 5);
   const items = await listItems(ctx, { status: "open" });
-  const fresh = items.find((i) => i.title.startsWith("pipeline-freshness"));
-  assert.equal(fresh.action.type, "edit-markdown");
+  // De titel is nu de bevinding zelf; de plek staat in `where`.
+  const fresh = items.find((i) => i.action?.type === "edit-markdown");
+  assert.match(fresh.title, /last update says/);
+  assert.match(fresh.where, /pipeline\.md/);
   const again = await runChecks(ctx, db, { live: false });
   assert.equal(again.inbox.posted, 0);
 });
 
 test("approve + run applies edit-markdown and writes the result", async () => {
-  const fresh = (await listItems(ctx)).find((i) => i.title.startsWith("pipeline-freshness"));
+  const fresh = (await listItems(ctx)).find((i) => i.action?.type === "edit-markdown" && i.status === "open");
   await reply(ctx, fresh.id, "ok, fix it", { status: "approved" });
   const r = await runApproved(ctx);
   assert.equal(r.length, 1); assert.ok(r[0].ok);
@@ -69,7 +71,7 @@ test("outward actions are refused", async () => {
 });
 
 test("rejected items silence the same finding", async () => {
-  const item = (await listItems(ctx, { status: "open" })).find((i) => i.title.startsWith("wikilinks"));
+  const item = (await listItems(ctx, { status: "open" })).find((i) => /dead wikilink/.test(i.title));
   await reply(ctx, item.id, "", { status: "rejected" });
   await runChecks(ctx, db, { live: false });
   assert.equal((await listItems(ctx)).filter((i) => i.fingerprint === item.fingerprint).length, 1);

@@ -67,7 +67,7 @@ try {
     case "index": out(await indexAll(ctx, db, { only: flags.only?.split(",") })); break;
     case "snapshot": out(await snapshotAll(ctx, db)); break;
     case "event": out(await recordEvent(ctx, db, rest[0])); break;
-    case "search": out(search(db, rest.join(" "), Number(process.env.N) || 8)); break;
+    case "search": out(search(db, rest.join(" "), Number(process.env.N) || 8, ctx)); break;
     case "context": out(context(db, ctx, rest[0])); break;
     case "status": out(status(db, ctx)); break;
     case "ask": {
