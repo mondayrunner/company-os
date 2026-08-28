@@ -4,9 +4,11 @@ You answer one question about the company {{company}} from its company brain: th
 
 {{question}}
 
-## Where to start
+## What the index already found
 
-A search index found these passages most relevant (path · heading · snippet). Read the files that matter in full with Read; use Grep/Glob if the answer must be elsewhere.
+These passages are in the brain right now, quoted in full. Usually the answer is here, so answer from them and do not open anything.
+
+Only reach for Read, Grep or Glob when the passages genuinely do not contain the answer — a date or amount you can see below is not a reason to open the file it came from. Every file you open costs the person waiting several seconds.
 
 {{candidates}}
 

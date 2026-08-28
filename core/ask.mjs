@@ -15,9 +15,19 @@ export async function ask(ctx, db, question, { askedBy = "human", n = 10 } = {})
   if (q.length < 3 || q.length > 800) throw new Error("question too short or too long");
   const t0 = Date.now();
   const candidates = search(db, q, n, ctx);
+  // De passages zelf meegeven, niet alleen hun pad. Een agent die tien keer een
+  // bestand opent, kost tien rondjes; het antwoord staat meestal in de tekst die
+  // de index al vasthad. Alleen als dat niet zo is, opent hij er zelf nog een.
+  const budget = ctx.config.ask.contextChars ?? 24000;
+  let used = 0;
   const list = candidates.length
-    ? candidates.map((k) => `- \`${k.path}\` · ${k.heading || k.title} · ${String(k.snippet).replace(/\s+/g, " ").slice(0, 220)}`).join("\n")
-    : "- (the index found nothing; search yourself with Grep/Glob)";
+    ? candidates.map((k) => {
+        const room = Math.max(0, Math.min(2200, budget - used));
+        const body = String(k.text ?? k.snippet ?? "").replace(/\n{3,}/g, "\n\n").slice(0, room);
+        used += body.length;
+        return `### \`${k.path}\`${k.heading ? ` · ${k.heading}` : ""}\n${body}`;
+      }).join("\n\n")
+    : "(the index found nothing; search yourself with Grep/Glob)";
   const live = await liveFor(ctx, q);
   const template = await readFile(ctx.config.ask.prompt ? ctx.path(ctx.config.ask.prompt) : join(PROMPTS, "ask.md"), "utf8");
   const prompt = fill(template, {

@@ -24,7 +24,7 @@ export function search(db, q, n = 8, ctx = null) {
   if (!content.length) return [];
   const weights = { ...FALLBACK_WEIGHTS, ...(config.weights ?? {}) };
   const statusFile = (ctx?.config?.accounts?.statusFile ?? "").toLowerCase();
-  const sql = `SELECT c.path, c.heading, snippet(chunks_fts, 0, '«', '»', '…', 18) snippet, bm25(chunks_fts, 1.0, 2.0) score, d.kind, d.title
+  const sql = `SELECT c.path, c.heading, c.text, snippet(chunks_fts, 0, '«', '»', '…', 18) snippet, bm25(chunks_fts, 1.0, 2.0) score, d.kind, d.title
     FROM chunks_fts JOIN chunks c ON c.id = chunks_fts.rowid JOIN documents d ON d.path = c.path
     WHERE chunks_fts MATCH ? ORDER BY score LIMIT ?`;
   const ask = (match) => { try { return db.prepare(sql).all(match, n * 6); } catch { return null; } };

@@ -3,12 +3,12 @@
 // with the answer and its sources. One field that both navigates and asks.
 const { cfg } = useConfig()
 const open = ref(false)
-const { question, busy, error: fault, answer, reading, ask, reset } = useAsk()
+const { question, busy, error: fault, answer, reading, ask, reset, show } = useAsk()
 const field = ref<HTMLInputElement | null>(null)
 const router = useRouter()
 const pages = computed(() => [{ p: "/", t: "Overview" }, ...cfg.value.nav, { p: "/inbox", t: "Inbox" }, { p: "/status", t: "Status" }, { p: "/ask", t: "All questions" }])
-const { data: brainData, refresh: refreshBrain } = useLazyFetch<any>("/api/brain", { server: false, key: "askbar-brain" })
-const earlier = computed(() => (brainData.value?.ok ? brainData.value.data.questions ?? [] : []))
+const { data: log, refresh: refreshBrain } = useLazyFetch<any>("/api/questions", { server: false, key: "askbar-log", query: { limit: 8 } })
+const earlier = computed(() => (log.value?.ok ? log.value.data.questions : []))
 const pageHits = computed(() => { const q = question.value.trim().toLowerCase(); return !q || q.length > 24 ? [] : pages.value.filter((p) => p.t.toLowerCase().includes(q)) })
 function show() { open.value = true; nextTick(() => field.value?.focus()) }
 function close() { open.value = false }
@@ -47,7 +47,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", key))
             <AnswerSources :sources="answer.sources" :live="answer.live" />
             <div class="mt-3 pt-2 border-t border-line-soft flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ink-3">
               <span :class="answer.found ? 'text-success' : 'text-orange'">{{ answer.found ? "found" : "not found in the brain" }}</span>
-              <span>{{ (answer.duration / 1000).toFixed(0) }} s</span><span v-if="answer.cost != null">${{ answer.cost.toFixed(2) }}</span>
+              <span v-if="answer.saved" class="text-ink-3">saved</span>
+              <span v-if="answer.duration">{{ (answer.duration / 1000).toFixed(0) }} s</span><span v-if="answer.cost != null">${{ answer.cost.toFixed(2) }}</span>
               <button class="ml-auto hover:text-ink" @click="reset(); field?.focus()">new question</button>
             </div>
           </div>
@@ -55,7 +56,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", key))
             <template v-if="cfg.examples.length"><p class="text-[10px] uppercase tracking-wider text-ink-3 px-2 mb-1">Try</p>
               <button v-for="v in cfg.examples" :key="v" class="w-full text-left text-[13px] px-2 py-1 rounded-lg hover:bg-header text-ink-2" @click="ask(v)">{{ v }}</button></template>
             <template v-if="earlier.length"><p class="text-[10px] uppercase tracking-wider text-ink-3 px-2 mt-3 mb-1">Asked before</p>
-              <button v-for="g in earlier.slice(0, 6)" :key="g.ts" class="w-full text-left text-[13px] px-2 py-1 rounded-lg hover:bg-header text-ink-2 flex gap-2" @click="ask(g.question)"><span :class="g.found ? 'text-success' : 'text-orange'">●</span><span class="truncate">{{ g.question }}</span><span class="ml-auto text-[11px] text-ink-3 shrink-0">{{ g.ts.slice(5, 10) }}</span></button></template>
+              <button v-for="g in earlier.slice(0, 6)" :key="g.ts" class="w-full text-left text-[13px] px-2 py-1 rounded-lg hover:bg-header text-ink-2 flex gap-2" :title="g.answer ? 'read the saved answer' : ''" @click="g.answer ? show(g) : ask(g.question)"><span :class="g.found ? 'text-success' : 'text-orange'">●</span><span class="truncate">{{ g.question }}</span><span class="ml-auto text-[11px] text-ink-3 shrink-0">{{ g.ts.slice(5, 10) }}</span></button></template>
           </div>
         </div>
         <div class="px-4 py-2 border-t border-line text-[10px] text-ink-3 flex gap-3"><span><kbd class="font-mono">↵</kbd> ask</span><span><kbd class="font-mono">esc</kbd> close</span><NuxtLink to="/ask" class="ml-auto hover:text-ink" @click="close">all questions →</NuxtLink></div>

@@ -41,6 +41,9 @@ export const DEFAULTS = {
   pipeline: null,
   ask: {
     command: "claude", allowedTools: "Read,Grep,Glob", model: null, agentModel: null, timeoutMs: 240000, log: null, canonical: [],
+    // Hoeveel tekst uit de index meegaat in de vraag. Meer context is bijna altijd
+    // sneller dan de agent het zelf laten opzoeken.
+    contextChars: 24000,
     // Words that mean "this fact can change": fetch the live source before answering.
     liveHints: {
       finance: ["mrr", "arr", "subscription", "abonnement", "invoice", "factuur", "revenue", "omzet", "stripe", "betaald", "paid"],
