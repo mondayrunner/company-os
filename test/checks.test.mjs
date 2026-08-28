@@ -70,3 +70,19 @@ test("search: a hit in the path outranks a chatty note that repeats the word", a
   assert.match(hits[0].path, /acme/i);
   assert.equal(new Set(hits.map((h) => h.path)).size, hits.length, "one hit per document");
 });
+
+test("questions survive losing the database: read back from the ask log", async () => {
+  const { readQuestionsLog } = await import("../core/index.mjs");
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const dir = join(root, "log");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "2026-01-02.md"),
+    "\n## 09:15 · What did we promise Acme?\n\nA proposal before Friday [[accounts/leads/2026-01-15-acme-website/STATUS.md]].\n\n<!-- found: true · sources: 1 · 12000 ms · $0.14 · human -->\n");
+  ctx.config.ask.log = "log";
+  assert.equal(await readQuestionsLog(ctx, db), 1);
+  const row = db.prepare("SELECT * FROM questions").get();
+  assert.match(row.question, /Acme/);
+  assert.equal(row.cost_usd, 0.14);
+  assert.deepEqual(JSON.parse(row.sources), ["accounts/leads/2026-01-15-acme-website/STATUS.md"]);
+  assert.equal(await readQuestionsLog(ctx, db), 0, "reading twice must not duplicate");
+});

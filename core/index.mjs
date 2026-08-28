@@ -7,7 +7,7 @@
 import { now, registerSource } from "./db.mjs";
 import { loadConnectors } from "./connectors.mjs";
 import { indexInbox } from "./inbox.mjs";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export async function indexAll(ctx, db, { only = null } = {}) {
@@ -27,8 +27,10 @@ export async function indexAll(ctx, db, { only = null } = {}) {
     report[c.name] = out;
   }
   report.inbox = await indexInbox(ctx, db);
-  const restored = await readMetricsFile(ctx, db);
-  if (restored) report.metrics = { restoredFromFile: restored };
+  const metrics = await readMetricsFile(ctx, db);
+  if (metrics) report.metrics = { restoredFromFile: metrics };
+  const questions = await readQuestionsLog(ctx, db);
+  if (questions) report.questions = { restoredFromLog: questions };
   return report;
 }
 
@@ -95,6 +97,44 @@ export async function writeMetricsFile(ctx, db) {
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, "date,key,value\n" + rows.map((r) => `${r.date},${r.key},${r.value}`).join("\n") + "\n");
   return { file: ctx.short(file), rows: rows.length };
+}
+
+/**
+ * Het vragenlogboek terug de database in.
+ *
+ * Vragen zijn net als metrics geen cache: een antwoord kostte geld en tijd, en
+ * je kunt het niet opnieuw afleiden uit de markdown. Ze worden bij elke vraag
+ * naar `ask.log` geschreven, dus dat dagboek is de bron en de tabel de kopie —
+ * andersom dan het voelt, maar het is de enige volgorde die een herbouw overleeft.
+ */
+export async function readQuestionsLog(ctx, db) {
+  const dir = ctx.config.ask?.log;
+  if (!dir) return 0;
+  let files = [];
+  try {
+    files = (await readdir(ctx.path(dir))).filter((f) => /^\d{4}-\d\d-\d\d\.md$/.test(f)).sort();
+  } catch (e) {
+    if (e.code === "ENOENT") return 0;   // nog nooit een vraag gesteld
+    throw e;
+  }
+  const ins = db.prepare("INSERT OR IGNORE INTO questions (ts, question, answer, sources, found, cost_usd, duration_ms, asked_by, archived) VALUES (?,?,?,?,?,?,?,?,0)");
+  const known = new Set(db.prepare("SELECT ts, question FROM questions").all().map((r) => `${r.ts}|${r.question}`));
+  let added = 0;
+  for (const f of files) {
+    const day = f.replace(/\.md$/, "");
+    const text = await readFile(ctx.path(`${dir}/${f}`), "utf8").catch(() => "");
+    // Eén blok per vraag: "## HH:MM · vraag", het antwoord, en een HTML-commentaar
+    // met wat het kostte. Precies wat ask.mjs erin schrijft.
+    for (const m of text.matchAll(/^## (\d\d:\d\d) · (.+?)\n([\s\S]*?)<!-- found: (true|false) · sources: (\d+) · (\d+) ms · \$([^ ]*) · ([a-z]+) -->/gm)) {
+      const [, time, question, body, found, , ms, cost, by] = m;
+      const ts = `${day}T${time}:00.000Z`;
+      if (known.has(`${ts}|${question}`)) continue;
+      const answer = body.trim();
+      const sources = [...answer.matchAll(/\[\[(live:[^\]]+|[^\]|#:]+?)(?::[\d-]+)?\]\]/g)].map((x) => x[1].trim());
+      added += ins.run(ts, question, answer, JSON.stringify([...new Set(sources)]), found === "true" ? 1 : 0, Number(cost) || null, Number(ms) || null, by).changes;
+    }
+  }
+  return added;
 }
 
 export async function readMetricsFile(ctx, db) {
