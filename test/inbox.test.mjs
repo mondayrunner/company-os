@@ -1,6 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { cpSync, rmSync, mkdtempSync, readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -94,4 +95,24 @@ test("mcp: tools and a search call", async () => {
 test("ask: live hints detect volatile kinds", () => {
   assert.deepEqual(liveKinds(ctx, "Wat is onze MRR en welke taken staan open?"), ["finance", "tasks"]);
   assert.deepEqual(liveKinds(ctx, "What did we promise Acme?"), []);
+});
+
+test("a finding that stops appearing closes its own item", async () => {
+  const { resolveStale } = await import("../core/inbox.mjs");
+  const open = await listItems(ctx, { status: "open,approved" });
+  const victim = open.find((i) => i.from === "check");
+  const survivors = open.filter((i) => i.from === "check" && i.id !== victim.id).map((i) => i.fingerprint);
+  const closed = await resolveStale(ctx, "check", survivors);
+  assert.deepEqual(closed, [victim.id]);
+  const after = (await listItems(ctx)).find((i) => i.id === victim.id);
+  assert.equal(after.status, "done");
+  assert.match(after.result, /no longer reports/);
+});
+
+test("approving a finding with no action still gives the agent an instruction", async () => {
+  const { parseItem } = await import("../core/inbox.mjs");
+  // We cannot run an agent in a test, so assert the branch that used to bail out is gone.
+  const src = await readFile(new URL("../core/inbox.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /no action and no reply to act on/);
+  assert.match(src, /Fix what this finding describes/);
 });

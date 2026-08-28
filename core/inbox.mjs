@@ -94,8 +94,9 @@ async function applyAction(ctx, item) {
     return { ok: false, message: "refused: this looks like an outward action (send, publish, invoice). Do it by hand; the brain only edits its own files." };
   }
   if (!a) {
-    if (!instruction) return { ok: false, message: "no action and no reply to act on" };
-    return agentAction(ctx, item, instruction);
+    // Approving a finding without typing anything means "yes, fix this". The
+    // finding itself says what is wrong and where, so that is the instruction.
+    return agentAction(ctx, item, instruction || `Fix what this finding describes. If it needs a decision only a human can make (which customer, which price, whether a lead is still alive), do not guess: say what you would need and stop.`);
   }
   switch (a.type) {
     case "edit-markdown": {
@@ -153,6 +154,27 @@ export async function runApproved(ctx, { only = null } = {}) {
     out.push({ id: item.id, ...r });
   }
   return out;
+}
+
+/**
+ * Close items whose finding no longer exists.
+ *
+ * A check that stops reporting something has answered its own item: the file
+ * was fixed, the folder was made, the number was removed. Leaving it open makes
+ * the inbox a graveyard, and you stop trusting the count.
+ */
+export async function resolveStale(ctx, from, liveFingerprints) {
+  const live = new Set(liveFingerprints);
+  const closed = [];
+  for (const item of await listItems(ctx, { status: "open,approved" })) {
+    if (item.from !== from || !item.fingerprint || live.has(item.fingerprint)) continue;
+    const { file, text } = await itemFile(ctx, item.id);
+    const stamp = `_${new Date().toISOString().slice(0, 16).replace("T", " ")}_ ✓ the check no longer reports this; closed on its own.`;
+    const withResult = /^## Result\s*$/m.test(text) ? text.replace(/(^## Result\s*\n)/m, `$1\n${stamp}\n`) : `${text.trimEnd()}\n\n## Result\n\n${stamp}\n`;
+    await writeFile(file, setFrontmatter(withResult, { status: "done" }));
+    closed.push(item.id);
+  }
+  return closed;
 }
 
 /** Mirror the inbox folder into the `inbox` table. */
