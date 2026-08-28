@@ -19,9 +19,11 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { frontmatter, setFrontmatter } from "./markdown.mjs";
+import { frontmatter, setFrontmatter, hashOf } from "./markdown.mjs";
+const hashPart = (s) => hashOf(s).slice(0, 7);
 import { runAgent, fill } from "./run.mjs";
 import { languageName } from "./ask.mjs";
+import { postItem } from "./inbox.mjs";
 
 const PROMPTS = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts");
 const MARKER = "brainlane link";
@@ -90,6 +92,12 @@ export async function link(ctx, { dryRun = false } = {}) {
     }
     if (!dryRun && scores.length) await writeFile(file, setFrontmatter(text, { [keys.proposal]: proposal }));
     out.open.push({ file: b, proposal: scores.slice(0, 3).map((s) => `${s.account} (${s.names.join("+")})`) });
+    if (!dryRun && ctx.config.inbox?.fromLink !== false) {
+      const rel = `${ctx.config.transcripts.inbox}/${b}`;
+      await postItem(ctx, { kind: "question", from: "link", title: `Which account does ${b} belong to?`, fingerprint: `l${hashPart(rel)}`,
+        body: `Transcript \`${rel}\` is not linked to an account.${scores.length ? `\n\nCandidates: ${scores.slice(0, 3).map((s) => `\`${s.account}\` (${s.names.join(", ")})`).join(", ")}` : "\n\nNo account name recognised."}\n\nReply with the account path (or \`internal\`) and approve.`,
+        action: { type: "set-frontmatter", file: rel, field: keys.account } });
+    }
   }
   return out;
 }

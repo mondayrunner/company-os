@@ -6,6 +6,7 @@
 // a day for history; nothing from them is ever copied into markdown.
 import { now, registerSource } from "./db.mjs";
 import { loadConnectors } from "./connectors.mjs";
+import { indexInbox } from "./inbox.mjs";
 
 export async function indexAll(ctx, db, { only = null } = {}) {
   const connectors = await loadConnectors(ctx, (c) => !isLive(c) && (!only || only.includes(c.name)));
@@ -23,6 +24,7 @@ export async function indexAll(ctx, db, { only = null } = {}) {
     registerSource(db, c, { count: out.count, added: r.added ?? out.changed ?? out.events ?? 0, message: r.message ?? summary(out) });
     report[c.name] = out;
   }
+  report.inbox = await indexInbox(ctx, db);
   return report;
 }
 

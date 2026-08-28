@@ -21,6 +21,7 @@ export default {
       const d = lines[j].match(/^\*\*(20\d\d-\d\d-\d\d)/)?.[1];
       if (d && d > newest) newest = d;
     }
-    return newest > header ? [{ severity: "warn", where: p.file, line: i + 1, what: `last update says ${header} but the newest log entry is ${newest}`, text: lines[i] }] : [];
+    return newest > header ? [{ severity: "warn", where: p.file, line: i + 1, what: `last update says ${header} but the newest log entry is ${newest}`, text: lines[i],
+      action: { type: "edit-markdown", file: p.file, replace: [{ from: lines[i], to: lines[i].replace(header, newest) }] } }] : [];
   },
 };

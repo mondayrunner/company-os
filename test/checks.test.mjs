@@ -1,6 +1,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
-import { rmSync } from "node:fs";
+import { rmSync, cpSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadContext } from "../core/config.mjs";
@@ -9,11 +10,13 @@ import { indexAll } from "../core/index.mjs";
 import { search } from "../core/search.mjs";
 import { runChecks } from "../core/checks.mjs";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "company");
-let ctx, db, result;
+const fixture = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "company");
+let root, ctx, db, result;
 
 before(async () => {
-  rmSync(join(root, ".brainlane"), { recursive: true, force: true });
+  // Work on a copy: checks post inbox items and write reports into the root.
+  root = mkdtempSync(join(tmpdir(), "brainlane-checks-"));
+  cpSync(fixture, root, { recursive: true });
   ctx = loadContext({ root });
   db = openDb(ctx);
   await indexAll(ctx, db);

@@ -12,6 +12,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadConnectors, byKind } from "./connectors.mjs";
 import { tableUnder, clean, slug } from "./markdown.mjs";
 import { writeStatus } from "./status.mjs";
+import { postItem } from "./inbox.mjs";
+import { hashOf } from "./markdown.mjs";
 
 const BUILTIN = join(dirname(fileURLToPath(import.meta.url)), "..", "checks");
 
@@ -116,7 +118,7 @@ export async function runChecks(ctx, db, { live = true, only = null } = {}) {
     try {
       for (const f of (await c.run(ctx, h)) ?? []) {
         if (f.text && h.suppressed(f.text)) continue;
-        findings.push({ check: c.name, severity: f.severity ?? "warn", where: f.where, line: f.line ?? null, what: f.what });
+        findings.push({ check: c.name, severity: f.severity ?? "warn", where: f.where, line: f.line ?? null, what: f.what, action: f.action ?? null });
       }
     } catch (e) { findings.push({ check: c.name, severity: "error", where: c.name, what: `check crashed: ${e.message}` }); }
   }
@@ -127,8 +129,17 @@ export async function runChecks(ctx, db, { live = true, only = null } = {}) {
   await mkdir(ctx.outputs, { recursive: true });
   const file = join(ctx.outputs, `check-${date}.md`);
   await writeFile(file, report);
-  await writeStatus(ctx, "check", { result: errors ? "partial" : "ok", done: checks.length - skipped.length, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings`, findings: findings.length, report: ctx.short(file) });
-  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name) };
+  // Every finding becomes an inbox item once: same finding next week → same fingerprint → no new item.
+  let posted = 0;
+  if (ctx.config.inbox?.fromChecks !== false) {
+    for (const f of findings) {
+      const r = await postItem(ctx, { kind: "drift", from: "check", title: `${f.check}: ${f.where}${f.line ? `:${f.line}` : ""} — ${f.what.slice(0, 80)}`, fingerprint: hashOf(`${f.check}|${f.where}|${f.what}`).slice(0, 8),
+        body: `**${f.severity}** · check \`${f.check}\` · \`${f.where}${f.line ? `:${f.line}` : ""}\`\n\n${f.what}\n\nReply with what to do (and approve), or reject to silence this finding.`, action: f.action ?? null });
+      if (r.created) posted++;
+    }
+  }
+  await writeStatus(ctx, "check", { result: errors ? "partial" : "ok", done: checks.length - skipped.length, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox`, findings: findings.length, inbox_new: posted, report: ctx.short(file) });
+  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted } };
 }
 
 function renderReport(ctx, { date, checks, findings, skipped, errors }) {

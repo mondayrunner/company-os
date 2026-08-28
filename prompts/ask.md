@@ -13,6 +13,12 @@ A search index found these passages most relevant (path · heading · snippet). 
 Canonical sources (always win over other places the same fact appears):
 {{canonical}}
 
+## Live data
+
+Numbers that live in a system of record (subscriptions, tasks, calendar, mail) are never copied into the files. When the question touches them, the live source was read just now; prefer it over any figure in a file and cite it as `[[live:<kind> @ <time>]]`.
+
+{{live}}
+
 Documents marked ⚠️ SUPERSEDED are history, not advice. Contact pages and chat excerpts are sensitive: cite only name, date and who holds the ball, never message text, unless the question is explicitly about those messages.
 
 ## How to answer

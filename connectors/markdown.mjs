@@ -6,11 +6,13 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { frontmatter, titleOf, chunks, hashOf } from "../core/markdown.mjs";
 
-async function* walk(dir, ignore) {
+// `ignore` entries are folder names ("node_modules") or root-relative paths ("knowledge/log").
+async function* walk(dir, root, ignore) {
   for (const d of await readdir(dir, { withFileTypes: true })) {
-    if (ignore.has(d.name) || d.name.startsWith(".")) continue;
+    if (d.name.startsWith(".")) continue;
     const p = join(dir, d.name);
-    if (d.isDirectory()) yield* walk(p, ignore);
+    if (ignore.has(d.name) || ignore.has(relative(root, p))) continue;
+    if (d.isDirectory()) yield* walk(p, root, ignore);
     else if (d.name.endsWith(".md")) yield p;
   }
 }
@@ -24,7 +26,7 @@ export default {
   async scan(ctx) {
     const ignore = new Set(ctx.config.ignore);
     const documents = [];
-    for await (const abs of walk(ctx.root, ignore)) {
+    for await (const abs of walk(ctx.root, ctx.root, ignore)) {
       const rel = relative(ctx.root, abs);
       const st = await stat(abs);
       const text = await readFile(abs, "utf8");

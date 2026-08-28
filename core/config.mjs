@@ -39,7 +39,17 @@ export const DEFAULTS = {
   connectors: { markdown: {}, status: {} },
   checks: {},
   pipeline: null,
-  ask: { command: "claude", allowedTools: "Read,Grep,Glob", model: null, timeoutMs: 240000, log: null, canonical: [] },
+  ask: {
+    command: "claude", allowedTools: "Read,Grep,Glob", model: null, agentModel: null, timeoutMs: 240000, log: null, canonical: [],
+    // Words that mean "this fact can change": fetch the live source before answering.
+    liveHints: {
+      finance: ["mrr", "arr", "subscription", "abonnement", "invoice", "factuur", "revenue", "omzet", "stripe", "betaald", "paid"],
+      tasks: ["task", "taak", "taken", "todo", "to-do", "card", "kaart", "trello", "backlog"],
+      calendar: ["calendar", "agenda", "meeting", "afspraak", "afspraken", "today", "vandaag", "tomorrow", "morgen", "this week", "deze week"],
+      mail: ["mail", "inbox", "e-mail", "email", "ongelezen", "unread"],
+    },
+  },
+  inbox: { dir: "inbox", fromChecks: true, fromLink: true },
   link: { namesModule: null, extraAccountDirs: [], editors: "ghostty|cursor|sublime|iterm|terminal|claude|code" },
 };
 

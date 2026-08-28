@@ -10,6 +10,8 @@
 //   brainlane link [--dry-run] [--smart]   attach waiting transcripts to accounts
 //   brainlane check [--no-live] [--only a,b] [--json]   deterministic checks, report + status
 //   brainlane live <kind> [what]     read one live source now (tasks, finance, calendar, mail)
+//   brainlane inbox list|post|reply|approve|reject|run   the one place agents talk back and you answer
+//   brainlane serve                  MCP server over stdio (search, context, ask, live, check, inbox)
 //   brainlane status                 what is in the brain, which sources were scanned
 //   brainlane import-legacy <db>     copy events/metrics/questions from a pre-brainlane db
 //   brainlane init [--language xx]   write a starter brainlane.config.json here
@@ -26,6 +28,9 @@ import { ask } from "../core/ask.mjs";
 import { link, linkSmart } from "../core/link.mjs";
 import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
+import { postItem, listItems, reply, runApproved } from "../core/inbox.mjs";
+import { serve } from "../mcp/server.mjs";
+import { readFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
 const flags = {};
@@ -34,7 +39,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a.startsWith("--")) {
     const k = a.slice(2);
-    if (["root", "only", "language", "name"].includes(k)) flags[k] = argv[++i];
+    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id"].includes(k)) flags[k] = argv[++i];
     else flags[k] = true;
   } else positional.push(a);
 }
@@ -90,6 +95,21 @@ try {
       out({ connector: c.name, ...(await c.live(query, ctx, c.options)) });
       break;
     }
+    case "inbox": {
+      // brainlane inbox list [--status open] | post --kind k --from f --title t [--file body.md] [--action json]
+      //                | reply <id> "text" [--approve|--reject] | approve <id> | reject <id> | run [--id x]
+      const [sub, id, ...words] = rest;
+      if (sub === "list" || !sub) out((await listItems(ctx, { status: flags.status ?? null })).map(({ id, kind, from, created, status, title, action }) => ({ id, kind, from, created, status, title, action: action?.type ?? null })));
+      else if (sub === "post") out(await postItem(ctx, { kind: flags.kind, from: flags.from ?? "cli", title: flags.title, body: flags.file ? readFileSync(flags.file, "utf8") : words.join(" "), action: flags.action ? JSON.parse(flags.action) : null }));
+      else if (sub === "reply") out(await reply(ctx, id, words.join(" "), { status: flags.approve ? "approved" : flags.reject ? "rejected" : null }));
+      else if (sub === "approve") out(await reply(ctx, id, words.join(" "), { status: "approved" }));
+      else if (sub === "reject") out(await reply(ctx, id, words.join(" "), { status: "rejected" }));
+      else if (sub === "show") out((await listItems(ctx)).find((i) => i.id === id) ?? { error: "not found" });
+      else if (sub === "run") { out(await runApproved(ctx, { only: flags.id ?? null })); await indexAll(ctx, db, { only: ["markdown"] }); }
+      else { console.error("inbox: list | post | reply | approve | reject | show | run"); process.exit(1); }
+      break;
+    }
+    case "serve": await serve(ctx, db); break;
     case "import-legacy": out(importLegacy(db, rest[0])); break;
     default: console.error(`unknown command: ${cmd}\n`); console.log(help()); process.exit(1);
   }
@@ -108,6 +128,8 @@ function help() {
   link [--dry-run] [--smart] attach waiting transcripts to accounts
   check [--no-live] [--only a,b] [--json]   deterministic checks → report + status
   live <kind> [what] [k=v]   read a live source now (tasks cards, finance subscriptions, calendar today, mail unread)
+  inbox list|post|reply|approve|reject|show|run   agents talk back here; approved items get executed
+  serve                      MCP server over stdio for agents
   status                     what is in the brain
   import-legacy <db>         copy history from a pre-brainlane database
   init [--language xx] [--name "..."]   starter config in the current folder
