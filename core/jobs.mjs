@@ -13,6 +13,7 @@
 //
 // `cron` is standard five-field cron. `service: true` = keep running (KeepAlive / @reboot / Restart=always).
 import { mkdir, readFile, writeFile, stat, rename, readdir } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
 import { existsSync } from "node:fs";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -236,11 +237,20 @@ export async function runJob(ctx, name) {
   const statusFile = join(ctx.stateDir, `${name}-status.json`);
   const before = (await stat(statusFile).catch(() => null))?.mtimeMs ?? 0;
   const started = Date.now();
+  // Everything the job says goes to its log, whoever started it: the scheduler
+  // redirects there anyway, and a run from the dashboard would otherwise vanish.
+  const out = createWriteStream(job.log, { flags: "a" });
+  out.write(`\n===== ${new Date().toISOString()} ${name} =====\n`);
   const code = await new Promise((resolve) => {
-    const p = spawn("/bin/bash", ["-lc", job.run], { cwd: ctx.root, stdio: "inherit", env: { ...process.env, COMPANY_OS_ROOT: ctx.root, PATH: `${pathFor(ctx)}:${process.env.PATH ?? ""}`, ...(job.env ?? {}) } });
+    const p = spawn("/bin/bash", ["-lc", job.run], { cwd: ctx.root, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, COMPANY_OS_ROOT: ctx.root, PATH: `${pathFor(ctx)}:${process.env.PATH ?? ""}`, ...(job.env ?? {}) } });
+    for (const stream of [p.stdout, p.stderr]) {
+      stream.pipe(out, { end: false });
+      if (process.stdout.isTTY) stream.pipe(process.stdout, { end: false });
+    }
     p.on("exit", (c) => resolve(c ?? 1));
     p.on("error", () => resolve(127));
   });
+  await new Promise((r) => out.end(r));
   const after = (await stat(statusFile).catch(() => null))?.mtimeMs ?? 0;
   const wroteNothing = after <= before;
   const seconds = Math.round((Date.now() - started) / 1000);
