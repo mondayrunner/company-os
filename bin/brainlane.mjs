@@ -49,7 +49,9 @@ if (cmd === "init") {
 }
 if (!cmd || cmd === "help" || flags.help) { console.log(help()); process.exit(0); }
 
-const ctx = loadContext({ root: flags.root });
+let ctx;
+try { ctx = loadContext({ root: flags.root }); }
+catch (e) { console.error(`brainlane: ${e.message}`); process.exit(2); }
 const db = openDb(ctx);
 try {
   switch (cmd) {
