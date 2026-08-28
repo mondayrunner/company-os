@@ -12,6 +12,7 @@
 //   brainlane live <kind> [what]     read one live source now (tasks, finance, calendar, mail)
 //   brainlane inbox list|post|reply|approve|reject|run   the one place agents talk back and you answer
 //   brainlane serve                  MCP server over stdio (search, context, ask, live, check, inbox)
+//   brainlane jobs list|install|uninstall|run   the job list from the config on launchd, cron or systemd
 //   brainlane status                 what is in the brain, which sources were scanned
 //   brainlane import-legacy <db>     copy events/metrics/questions from a pre-brainlane db
 //   brainlane init [--language xx]   write a starter brainlane.config.json here
@@ -30,6 +31,7 @@ import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
 import { postItem, listItems, reply, runApproved } from "../core/inbox.mjs";
 import { serve } from "../mcp/server.mjs";
+import { install, uninstall, runJob, listJobs } from "../core/jobs.mjs";
 import { readFileSync } from "node:fs";
 
 const argv = process.argv.slice(2);
@@ -39,7 +41,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a.startsWith("--")) {
     const k = a.slice(2);
-    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id"].includes(k)) flags[k] = argv[++i];
+    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id", "target"].includes(k)) flags[k] = argv[++i];
     else flags[k] = true;
   } else positional.push(a);
 }
@@ -110,6 +112,16 @@ try {
       break;
     }
     case "serve": await serve(ctx, db); break;
+    case "jobs": {
+      // brainlane jobs list | install [--target launchd|cron|systemd] [name] [--dry-run] [--force] | uninstall [name] | run <name>
+      const [sub, name] = rest;
+      if (sub === "list" || !sub) out(await listJobs(ctx));
+      else if (sub === "install") out(await install(ctx, { target: flags.target, only: name ?? null, dryRun: !!flags["dry-run"], force: !!flags.force }));
+      else if (sub === "uninstall") out(await uninstall(ctx, { target: flags.target, only: name ?? null }));
+      else if (sub === "run") { db.close(); process.exit(await runJob(ctx, name)); }
+      else { console.error("jobs: list | install | uninstall | run <name>"); process.exit(1); }
+      break;
+    }
     case "import-legacy": out(importLegacy(db, rest[0])); break;
     default: console.error(`unknown command: ${cmd}\n`); console.log(help()); process.exit(1);
   }
@@ -130,6 +142,7 @@ function help() {
   live <kind> [what] [k=v]   read a live source now (tasks cards, finance subscriptions, calendar today, mail unread)
   inbox list|post|reply|approve|reject|show|run   agents talk back here; approved items get executed
   serve                      MCP server over stdio for agents
+  jobs list|install|uninstall|run <name>   schedule the config's jobs on launchd, cron or systemd
   status                     what is in the brain
   import-legacy <db>         copy history from a pre-brainlane database
   init [--language xx] [--name "..."]   starter config in the current folder
