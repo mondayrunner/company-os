@@ -90,11 +90,12 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
             {{ content.open.length }} waiting for you · {{ content.total }} in total
             <button class="ml-2 text-red hover:underline" :disabled="busy" @click="refresh()">{{ busy ? "working…" : "refresh" }}</button>
             <span v-if="note" class="ml-2 text-red">{{ note }}</span>
+            <Waiting v-if="working && working !== 'run'" :active="true" class="ml-2" small />
           </p>
           <p v-else-if="data && !data.ok" class="text-[13px] text-red mt-1.5 font-mono">{{ data.error }}</p>
         </div>
         <button v-if="content?.approved.length" class="text-[12px] px-3 py-1.5 rounded-full bg-ink text-card hover:opacity-80 disabled:opacity-40 shrink-0" :disabled="working === 'run'" @click="act('run')">
-          {{ working === "run" ? "running…" : `Run ${content.approved.length} approved` }}
+          <Waiting v-if="working === 'run'" :active="true" small /><template v-else>Run {{ content.approved.length }} approved</template>
         </button>
       </div>
 
@@ -131,7 +132,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
                 <button class="text-[11px] px-2 py-1 rounded-full text-success hover:bg-success-bg disabled:opacity-40" :disabled="working === i.id" title="approve (a)" @click.stop="act('approve', i.id, reply[i.id])">✓</button>
                 <button class="text-[11px] px-2 py-1 rounded-full text-ink-3 hover:bg-header disabled:opacity-40" :disabled="working === i.id" title="reject (r)" @click.stop="act('reject', i.id)">✕</button>
               </div>
-              <button v-else-if="i.status === 'approved'" class="text-[11px] px-2 py-1 rounded-full bg-ink text-card hover:opacity-80 disabled:opacity-40 shrink-0" :disabled="working === i.id" title="run (u)" @click.stop="act('run', i.id)">run</button>
+              <button v-else-if="i.status === 'approved'" class="text-[11px] px-2 py-1 rounded-full bg-ink text-card hover:opacity-80 disabled:opacity-40 shrink-0 min-w-[2.6rem]" :disabled="!!working" title="run (u)" @click.stop="act('run', i.id)">{{ working === i.id ? "…" : "run" }}</button>
             </div>
 
             <div v-if="expanded[i.id]" class="px-4 pb-4 pt-1 pl-11 text-[13px] text-ink space-y-3">

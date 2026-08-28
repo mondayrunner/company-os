@@ -11,6 +11,19 @@ const busy = computed(() => sysStatus.value === "pending")
 const working = ref<string | null>(null)
 const logOpen = ref<string | null>(null)
 const note = ref<{ name: string; ok: boolean; text: string } | null>(null)
+const fixing = ref<string | null>(null)
+const fixResult = reactive<Record<string, { text: string; ok: boolean }>>({})
+async function fix(name: string) {
+  if (fixing.value) return
+  fixing.value = name
+  try {
+    const r: any = await $fetch("/api/fix", { method: "POST", body: { job: name } })
+    fixResult[name] = { text: r?.ok ? r.answer : r?.error ?? "failed", ok: !!r?.fixed }
+    refreshSys()
+  } catch (e: any) {
+    fixResult[name] = { text: e?.data?.error || e?.message || "failed", ok: false }
+  } finally { fixing.value = null }
+}
 const broken = computed(() => jobs.value.filter((j: any) => j.state === "error" || j.stale).length)
 
 const stateTone: Record<string, string> = { ok: "bg-success", partial: "bg-orange", error: "bg-red", unknown: "bg-ink-3" }
@@ -56,10 +69,22 @@ async function run(name: string) {
             <span v-else-if="j.state === 'partial'" class="ml-auto text-orange text-[11px] shrink-0">partly</span>
             <span v-else-if="j.state === 'unknown'" class="ml-auto text-ink-3 text-[11px] shrink-0">no status yet</span>
             <span v-else class="ml-auto text-[11px] shrink-0" :class="j.stale ? 'text-orange' : 'text-success'">{{ j.stale ? `${j.age}d quiet` : "ok" }}</span>
+            <button
+              v-if="j.state === 'error' || j.state === 'partial' || j.stale"
+              class="text-[11px] px-2 py-0.5 rounded-full bg-red text-white hover:bg-red-hover transition-colors shrink-0 disabled:opacity-40"
+              :disabled="!!fixing"
+              title="let an agent read the log and fix the cause"
+              @click="fix(j.name)"
+            >✦ fix</button>
             <button v-if="!j.service" class="ml-1.5 text-ink-3 hover:text-red transition-colors text-[12px] px-1 shrink-0 disabled:opacity-40" :disabled="working === j.name" title="run now" @click="run(j.name)">{{ working === j.name ? "…" : "▶" }}</button>
             <button class="text-ink-3 hover:text-ink transition-colors text-[11px] px-1 shrink-0" title="last run and log tail" @click="logOpen = logOpen === j.name ? null : j.name">{{ logOpen === j.name ? "▾" : "▸" }}</button>
           </div>
           <p v-if="j.lastRun" class="text-[11px] text-ink-3 px-4 pb-1.5 pl-9 truncate">{{ fmt.when(j.lastRun) }}<span v-if="j.message"> · {{ j.message }}</span></p>
+          <p v-if="fixing === j.name" class="px-4 pb-2 pl-9"><Waiting :active="true" detail="reading the log" small /></p>
+          <div v-else-if="fixResult[j.name]" class="mx-4 mb-2 ml-9 rounded-lg bg-header px-3 py-2 flex items-start gap-2">
+            <span class="text-[11px] shrink-0 mt-0.5" :class="fixResult[j.name].ok ? 'text-success' : 'text-orange'">{{ fixResult[j.name].ok ? "✓" : "!" }}</span>
+            <pre class="text-[12px] text-ink-2 whitespace-pre-wrap font-sans leading-relaxed grow">{{ fixResult[j.name].text }}</pre>
+          </div>
           <pre v-if="logOpen === j.name" class="mx-4 mb-2 ml-9 rounded-lg bg-header px-2.5 py-2 text-[10.5px] leading-snug text-ink-2 whitespace-pre-wrap break-all max-h-40 overflow-auto">{{ j.tail?.length ? j.tail.join("\n") : "no log yet" }}
 <span class="text-ink-3">$ {{ j.run }}</span></pre>
         </div>
