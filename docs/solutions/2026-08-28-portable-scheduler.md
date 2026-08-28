@@ -6,7 +6,7 @@ tags: [jobs, launchd, cron, systemd, status-contract]
 
 # One job list, three schedulers
 
-**What we did.** `jobs` in the config with standard five-field cron; `brainlane jobs install` renders launchd plists, a crontab block or systemd user units and installs them; `brainlane jobs run <name>` wraps any command in the status contract (log rotation, a status file from the exit code when the job wrote none). The dashboard reads the same list.
+**What we did.** `jobs` in the config with standard five-field cron; `company-os jobs install` renders launchd plists, a crontab block or systemd user units and installs them; `company-os jobs run <name>` wraps any command in the status contract (log rotation, a status file from the exit code when the job wrote none). The dashboard reads the same list.
 
 **What we learned.**
 

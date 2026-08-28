@@ -1,8 +1,8 @@
-import { loadConnectors } from "../../../core/connectors.mjs"
-import { listJobs } from "../../../core/jobs.mjs"
+import { loadConnectors } from "#core/connectors.mjs"
+import { listJobs } from "#core/jobs.mjs"
 
 // The dashboard mirrors the config: every connector and job is a module with a
-// state. Turning one off is one line in brainlane.config.json.
+// state. Turning one off is one line in company-os.config.json.
 export default defineEventHandler(async () =>
   source("Modules", async () => {
     const c = ctx()

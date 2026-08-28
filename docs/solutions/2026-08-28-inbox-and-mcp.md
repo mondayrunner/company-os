@@ -6,7 +6,7 @@ tags: [inbox, mcp, human-in-the-loop]
 
 # The inbox is where the approval gate becomes software
 
-**What we did.** `inbox/` with one markdown file per item, fingerprinted; `brainlane inbox list|post|reply|approve|reject|run`; checks and `link` post there; `brainlane serve` exposes the brain as an MCP server; `ask` fetches a live source when the question touches one.
+**What we did.** `inbox/` with one markdown file per item, fingerprinted; `company-os inbox list|post|reply|approve|reject|run`; checks and `link` post there; `company-os serve` exposes the brain as an MCP server; `ask` fetches a live source when the question touches one.
 
 **What we learned.**
 

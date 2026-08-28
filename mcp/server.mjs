@@ -1,4 +1,4 @@
-// `brainlane serve`: the brain as an MCP server over stdio (newline-delimited
+// `company-os serve`: the brain as an MCP server over stdio (newline-delimited
 // JSON-RPC 2.0), so any agent can search, read context, ask, check live sources
 // and post to the inbox. No dependency. Nothing here writes to a source; the
 // only "writing" tool posts a question or proposal for a human.
@@ -15,7 +15,7 @@ export const TOOLS = [
   { name: "ask", description: "Ask the brain a question in natural language; answers with [[source]] per claim and checks live sources when the fact can change. Costs an agent run — prefer `search` for lookups.", inputSchema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] } },
   { name: "live", description: "Read a live source now: kind = tasks (what: cards) | finance (subscriptions, open-invoices) | calendar (today, range from/to) | mail (unread). Never copy these numbers into markdown.", inputSchema: { type: "object", properties: { kind: { type: "string" }, what: { type: "string" }, from: { type: "string" }, to: { type: "string" }, limit: { type: "number" } }, required: ["kind"] } },
   { name: "check", description: "Run the deterministic checks (stale pages, dead links, pipeline drift, copied figures, subscriptions vs accounts). Findings become inbox items.", inputSchema: { type: "object", properties: { live: { type: "boolean", default: true } } } },
-  { name: "inbox_post", description: "Talk back to the human: post a question, proposal or finding to the inbox. The human replies there; approved items are executed by `brainlane inbox run`.", inputSchema: { type: "object", properties: { kind: { type: "string", enum: ["question", "proposal", "drift", "report"] }, title: { type: "string" }, body: { type: "string" }, action: { type: "object", description: "optional: {type: edit-markdown|set-frontmatter|move-file|agent, …}" } }, required: ["title", "body"] } },
+  { name: "inbox_post", description: "Talk back to the human: post a question, proposal or finding to the inbox. The human replies there; approved items are executed by `company-os inbox run`.", inputSchema: { type: "object", properties: { kind: { type: "string", enum: ["question", "proposal", "drift", "report"] }, title: { type: "string" }, body: { type: "string" }, action: { type: "object", description: "optional: {type: edit-markdown|set-frontmatter|move-file|agent, …}" } }, required: ["title", "body"] } },
   { name: "inbox_list", description: "List inbox items, optionally by status (open, approved, rejected, done, failed).", inputSchema: { type: "object", properties: { status: { type: "string" } } } },
   { name: "status", description: "What is in the brain: counts, sources, latest runs.", inputSchema: { type: "object", properties: {} } },
 ];
@@ -50,7 +50,7 @@ export function serve(ctx, db) {
     const reply = (result) => id !== undefined && send({ jsonrpc: "2.0", id, result });
     const fail = (code, message) => id !== undefined && send({ jsonrpc: "2.0", id, error: { code, message } });
     try {
-      if (method === "initialize") reply({ protocolVersion: params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "brainlane", version: "0.1.0" } });
+      if (method === "initialize") reply({ protocolVersion: params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "company-os", version: "0.1.0" } });
       else if (method === "notifications/initialized" || method?.startsWith("notifications/")) { /* no reply */ }
       else if (method === "ping") reply({});
       else if (method === "tools/list") reply({ tools: TOOLS });
@@ -60,6 +60,6 @@ export function serve(ctx, db) {
       } else fail(-32601, `method not found: ${method}`);
     } catch (e) { fail(-32603, e.message); }
   });
-  process.stderr.write(`brainlane mcp: serving ${ctx.root}\n`);
+  process.stderr.write(`company-os mcp: serving ${ctx.root}\n`);
   return new Promise((resolve) => rl.on("close", resolve));
 }

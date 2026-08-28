@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // What is on: every connector and job from the config, with its state. The
-// dashboard is a mirror of brainlane.config.json — turning something off is
+// dashboard is a mirror of company-os.config.json — turning something off is
 // one line there, and it disappears here.
 const { fmt } = useConfig()
 const { data: sys, refresh: refreshSys, status: sysStatus } = useLazyFetch<any>("/api/system", { server: false })
@@ -44,7 +44,7 @@ async function run(name: string) {
 
       <div class="rounded-2xl ring-1 ring-line bg-card overflow-hidden mb-6">
         <div class="flex items-center gap-2.5 px-4 h-9 bg-header border-b border-line">
-          <h2 class="text-[12px] font-semibold text-ink leading-none">Jobs</h2><span class="text-[11px] text-ink-3">from <code class="font-mono">brainlane.config.json</code></span>
+          <h2 class="text-[12px] font-semibold text-ink leading-none">Jobs</h2><span class="text-[11px] text-ink-3">from <code class="font-mono">company-os.config.json</code></span>
         </div>
         <div v-for="j in jobs" :key="j.name" class="border-b border-line-soft last:border-0">
           <div class="flex items-center gap-2.5 px-4 py-2 text-[13px]">
@@ -82,7 +82,7 @@ async function run(name: string) {
 
       <p v-if="modules" class="text-[11px] text-ink-3 leading-relaxed">
         Root <code class="font-mono">{{ modules.root }}</code> · config <code class="font-mono">{{ modules.config }}</code> · index <code class="font-mono">{{ modules.db }}</code>.
-        Add or remove a module by editing the config, then <code class="font-mono">brainlane jobs install</code>.
+        Add or remove a module by editing the config, then <code class="font-mono">company-os jobs install</code>.
       </p>
     </div>
   </div>

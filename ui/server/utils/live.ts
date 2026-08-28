@@ -1,4 +1,4 @@
-import { loadConnectors, byKind } from "../../../core/connectors.mjs"
+import { loadConnectors, byKind } from "#core/connectors.mjs"
 
 /** Read one live source through its connector (tasks, finance, calendar, mail). */
 export async function live(kind: string, query: Record<string, any> = {}) {

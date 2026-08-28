@@ -1,8 +1,8 @@
 {
   "name": "Fixture Co",
   "language": "en",
-  "db": ".brainlane/brain.db",
-  "stateDir": ".brainlane/state",
+  "db": ".company-os/brain.db",
+  "stateDir": ".company-os/state",
   "outputs": "outputs",
   "kinds": [
     { "kind": "knowledge", "prefix": "knowledge/" },

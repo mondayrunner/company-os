@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises"
-import { listJobs } from "../../../core/jobs.mjs"
+import { listJobs } from "#core/jobs.mjs"
 
 /**
  * Are the automations still running? Per job: its own status file (the job
- * wrote it, or `brainlane jobs run` did from the exit code), how old the last
+ * wrote it, or `company-os jobs run` did from the exit code), how old the last
  * run is in days that count for that job, and the tail of its log.
  */
 function daysAgo(d: Date) { return Math.floor((Date.now() - d.getTime()) / 864e5) }

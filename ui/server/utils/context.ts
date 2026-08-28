@@ -1,13 +1,13 @@
-import { loadContext } from "../../../core/config.mjs"
+import { loadContext } from "#core/config.mjs"
 
 /**
- * The brainlane context (root, config, paths) for server routes. The root is
- * BRAINLANE_ROOT or the nearest brainlane.config.json upward from the cwd —
+ * The company-os context (root, config, paths) for server routes. The root is
+ * COMPANY_OS_ROOT or the nearest company-os.config.json upward from the cwd —
  * the same rule as the CLI, so the dashboard and the terminal never disagree.
  */
 let cached: any = null
 export function ctx() {
-  if (!cached) cached = loadContext({ root: process.env.BRAINLANE_ROOT })
+  if (!cached) cached = loadContext({ root: process.env.COMPANY_OS_ROOT })
   return cached
 }
 
@@ -19,7 +19,7 @@ export function publicConfig() {
     name: c.config.name,
     language: c.config.language,
     locale: ({ nl: "nl-NL", en: "en-GB", de: "de-DE", fr: "fr-FR", es: "es-ES" } as Record<string, string>)[c.config.language] ?? "en-GB",
-    title: ui.title ?? "brainlane",
+    title: ui.title ?? "company-os",
     logo: ui.logo ?? null,
     nav: ui.nav ?? [],
     examples: ui.examples ?? [],

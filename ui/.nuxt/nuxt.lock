@@ -1,0 +1,9 @@
+{
+  "pid": 40473,
+  "startedAt": 1787900180462,
+  "command": "dev",
+  "cwd": "/Users/timvandenbosch/Sites/brainlane/ui",
+  "port": 4331,
+  "hostname": "::1",
+  "url": "http://[::1]:4331"
+}

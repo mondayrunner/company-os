@@ -1,4 +1,4 @@
-// Ask the brain: `brainlane ask --json`. Index candidates, a headless agent reads
+// Ask the brain: `company-os ask --json`. Index candidates, a headless agent reads
 // the real files, live sources when the question touches one, sources per claim.
 export default defineEventHandler(async (event) => {
   const { question } = await readBody<{ question: string }>(event)

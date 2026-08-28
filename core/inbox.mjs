@@ -2,7 +2,7 @@
 //
 // Every item is a markdown file in <root>/<config.inbox.dir> (git-visible,
 // works without any tool); SQLite indexes them for the dashboard and MCP.
-// A reply is the trigger: `brainlane inbox run` executes approved items and
+// A reply is the trigger: `company-os inbox run` executes approved items and
 // writes the result back into the same file. This is the only place the brain
 // writes markdown, and only after a human said yes to that specific item.
 // Outward actions (send, publish, invoice) are refused: those stay proposals

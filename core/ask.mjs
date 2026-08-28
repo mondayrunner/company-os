@@ -1,4 +1,4 @@
-// `brainlane ask "<question>"`: FTS candidates from the index, then a headless
+// `company-os ask "<question>"`: FTS candidates from the index, then a headless
 // agent reads the real files and answers with a source per claim. Every
 // question is logged: a question without a source is a gap in the structure.
 import { readFile, mkdir, appendFile } from "node:fs/promises";

@@ -18,7 +18,7 @@ export async function writeStatus(ctx, job, { result = "ok", done = 0, failed = 
   return file;
 }
 
-/** `brainlane event <status.json>`: record one job run (called by shell wrappers). */
+/** `company-os event <status.json>`: record one job run (called by shell wrappers). */
 export async function recordEvent(ctx, db, file) {
   const s = JSON.parse(await readFile(file, "utf8"));
   const e = normalizeStatus(s, file.split("/").pop().replace(/-status\.json$/, ""));

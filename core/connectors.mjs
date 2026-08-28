@@ -4,7 +4,7 @@
 //     name: "trello",
 //     kind: "tasks",          // tasks | crm | finance | calendar | mail | transcripts | knowledge | files | events | metrics
 //     volatile: true,         // true: never copied into markdown; read live, snapshotted daily
-//     location: "...",        // shown in `brainlane status`
+//     location: "...",        // shown in `company-os status`
 //     scan(ctx)  -> { documents?, events?, metrics?, count, added, message }
 //     live(query, ctx) -> { items }        // optional, inference-time retrieval
 //   }

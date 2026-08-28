@@ -15,7 +15,7 @@ let root, ctx, db, result;
 
 before(async () => {
   // Work on a copy: checks post inbox items and write reports into the root.
-  root = mkdtempSync(join(tmpdir(), "brainlane-checks-"));
+  root = mkdtempSync(join(tmpdir(), "company-os-checks-"));
   cpSync(fixture, root, { recursive: true });
   ctx = loadContext({ root });
   db = openDb(ctx);

@@ -16,9 +16,9 @@ const fixture = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "compa
 let root, ctx, db;
 
 before(async () => {
-  root = mkdtempSync(join(tmpdir(), "brainlane-"));
+  root = mkdtempSync(join(tmpdir(), "company-os-"));
   cpSync(fixture, root, { recursive: true });
-  rmSync(join(root, ".brainlane"), { recursive: true, force: true });
+  rmSync(join(root, ".company-os"), { recursive: true, force: true });
   ctx = loadContext({ root });
   db = openDb(ctx);
   await indexAll(ctx, db);

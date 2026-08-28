@@ -30,7 +30,7 @@ export default {
           const raw = m[1];
           if (!/[\/.]/.test(raw) || /\s/.test(raw) || /^https?:/.test(raw) || /^\[\[/.test(raw) || /[{*<>]|YYYY|<[a-z]+>/i.test(raw)) continue;
           if (/^[a-z0-9-]+\.[a-z]{2,}\//i.test(raw)) continue; // domain/path, not a file
-          if (/^(npm|node|bash|git|launchctl|curl|cd|ls|cp|ln|npx|claude|python3|source|brainlane)\b/.test(raw)) continue;
+          if (/^(npm|node|bash|git|launchctl|curl|cd|ls|cp|ln|npx|claude|python3|source|company-os)\b/.test(raw)) continue;
           let p = raw.replace(/[),.;:]+$/, "").replace(/:\d+(-\d+)?$/, "");
           let target = null, absolute = false;
           if (p.startsWith("~/")) { target = join(ctx.home, p.slice(2)); absolute = true; }

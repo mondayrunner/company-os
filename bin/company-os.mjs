@@ -1,23 +1,23 @@
 #!/usr/bin/env node
-// brainlane: a company brain in markdown and SQLite.
+// company-os: a company brain in markdown and SQLite.
 //
-//   brainlane index [--only a,b]     scan connectors → documents, chunks, relations, events
-//   brainlane snapshot               daily metrics from the live (metric) connectors
-//   brainlane event <status.json>    record one job run (called by job wrappers)
-//   brainlane search "<query>"       full-text search, top 8 (N=20 for more)
-//   brainlane context <account>      everything around one account
-//   brainlane ask "<question>"       answer with sources via a headless agent
-//   brainlane link [--dry-run] [--smart]   attach waiting transcripts to accounts
-//   brainlane check [--no-live] [--only a,b] [--json]   deterministic checks, report + status
-//   brainlane live <kind> [what]     read one live source now (tasks, finance, calendar, mail)
-//   brainlane inbox list|post|reply|approve|reject|run   the one place agents talk back and you answer
-//   brainlane serve                  MCP server over stdio (search, context, ask, live, check, inbox)
-//   brainlane jobs list|install|uninstall|run   the job list from the config on launchd, cron or systemd
-//   brainlane status                 what is in the brain, which sources were scanned
-//   brainlane import-legacy <db>     copy events/metrics/questions from a pre-brainlane db
-//   brainlane init [--language xx]   write a starter brainlane.config.json here
+//   company-os index [--only a,b]     scan connectors → documents, chunks, relations, events
+//   company-os snapshot               daily metrics from the live (metric) connectors
+//   company-os event <status.json>    record one job run (called by job wrappers)
+//   company-os search "<query>"       full-text search, top 8 (N=20 for more)
+//   company-os context <account>      everything around one account
+//   company-os ask "<question>"       answer with sources via a headless agent
+//   company-os link [--dry-run] [--smart]   attach waiting transcripts to accounts
+//   company-os check [--no-live] [--only a,b] [--json]   deterministic checks, report + status
+//   company-os live <kind> [what]     read one live source now (tasks, finance, calendar, mail)
+//   company-os inbox list|post|reply|approve|reject|run   the one place agents talk back and you answer
+//   company-os serve                  MCP server over stdio (search, context, ask, live, check, inbox)
+//   company-os jobs list|install|uninstall|run   the job list from the config on launchd, cron or systemd
+//   company-os status                 what is in the brain, which sources were scanned
+//   company-os import-legacy <db>     copy events/metrics/questions from a pre-company-os db
+//   company-os init [--language xx]   write a starter company-os.config.json here
 //
-// Global: --root <dir> (else BRAINLANE_ROOT / COMPANY_OS / nearest config upward).
+// Global: --root <dir> (else COMPANY_OS_ROOT / COMPANY_OS / nearest config upward).
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadContext, DEFAULTS, CONFIG_FILE } from "../core/config.mjs";
@@ -53,14 +53,14 @@ if (cmd === "init") {
   if (existsSync(file)) { console.error(`${CONFIG_FILE} already exists`); process.exit(1); }
   const cfg = { name: flags.name ?? "My company", language: flags.language ?? "en", ...pick(DEFAULTS, ["db", "stateDir", "outputs", "kinds", "accounts", "transcripts", "connectors"]) };
   writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
-  console.log(`wrote ${file}\nnext: brainlane index && brainlane check`);
+  console.log(`wrote ${file}\nnext: company-os index && company-os check`);
   process.exit(0);
 }
 if (!cmd || cmd === "help" || flags.help) { console.log(help()); process.exit(0); }
 
 let ctx;
 try { ctx = loadContext({ root: flags.root }); }
-catch (e) { console.error(`brainlane: ${e.message}`); process.exit(2); }
+catch (e) { console.error(`company-os: ${e.message}`); process.exit(2); }
 const db = openDb(ctx);
 try {
   switch (cmd) {
@@ -88,7 +88,7 @@ try {
       break;
     }
     case "live": {
-      // brainlane live <kind> [what] [key=value…]: inference-time retrieval from one connector
+      // company-os live <kind> [what] [key=value…]: inference-time retrieval from one connector
       const [kind, what, ...kv] = rest;
       const connectors = await loadConnectors(ctx);
       const c = byKind(connectors, kind).find((x) => x.live);
@@ -98,7 +98,7 @@ try {
       break;
     }
     case "inbox": {
-      // brainlane inbox list [--status open] | post --kind k --from f --title t [--file body.md] [--action json]
+      // company-os inbox list [--status open] | post --kind k --from f --title t [--file body.md] [--action json]
       //                | reply <id> "text" [--approve|--reject] | approve <id> | reject <id> | run [--id x]
       const [sub, id, ...words] = rest;
       if (sub === "list" || !sub) out((await listItems(ctx, { status: flags.status ?? null })).map(({ id, kind, from, created, status, title, action }) => ({ id, kind, from, created, status, title, action: action?.type ?? null })));
@@ -113,7 +113,7 @@ try {
     }
     case "serve": await serve(ctx, db); break;
     case "jobs": {
-      // brainlane jobs list | install [--target launchd|cron|systemd] [name] [--dry-run] [--force] | uninstall [name] | run <name>
+      // company-os jobs list | install [--target launchd|cron|systemd] [name] [--dry-run] [--force] | uninstall [name] | run <name>
       const [sub, name] = rest;
       if (sub === "list" || !sub) out(await listJobs(ctx));
       else if (sub === "install") out(await install(ctx, { target: flags.target, only: name ?? null, dryRun: !!flags["dry-run"], force: !!flags.force }));
@@ -129,12 +129,12 @@ try {
 
 function pick(o, keys) { return Object.fromEntries(keys.map((k) => [k, o[k]])); }
 function help() {
-  return `brainlane — a company brain in markdown and SQLite
+  return `company-os — a company brain in markdown and SQLite
 
   index [--only a,b]         scan connectors → documents, chunks, relations, events
   snapshot                   daily metrics from live connectors
   event <status.json>        record one job run
-  search "<query>"           full-text search (N=20 brainlane search ... for more)
+  search "<query>"           full-text search (N=20 company-os search ... for more)
   context <account>          everything around one account
   ask "<question>" [--json]  answer with sources via a headless agent
   link [--dry-run] [--smart] attach waiting transcripts to accounts
@@ -144,8 +144,8 @@ function help() {
   serve                      MCP server over stdio for agents
   jobs list|install|uninstall|run <name>   schedule the config's jobs on launchd, cron or systemd
   status                     what is in the brain
-  import-legacy <db>         copy history from a pre-brainlane database
+  import-legacy <db>         copy history from a pre-company-os database
   init [--language xx] [--name "..."]   starter config in the current folder
 
-  --root <dir>               root with brainlane.config.json (else BRAINLANE_ROOT)`;
+  --root <dir>               root with company-os.config.json (else COMPANY_OS_ROOT)`;
 }

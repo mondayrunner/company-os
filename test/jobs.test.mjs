@@ -30,12 +30,12 @@ test("systemd OnCalendar", () => {
 
 test("rendered files carry the job", () => {
   const ctx = { root: "/tmp/vault", home: "/tmp/home", config: {} };
-  const job = { name: "check", label: "com.x.check", run: "brainlane check", cron: "0 8 * * 1", log: "/tmp/check.log" };
+  const job = { name: "check", label: "com.x.check", run: "company-os check", cron: "0 8 * * 1", log: "/tmp/check.log" };
   const plist = renderLaunchd(ctx, job);
   assert.match(plist, /<key>Label<\/key><string>com.x.check<\/string>/);
   assert.match(plist, /jobs run check/);
   assert.match(plist, /<key>Weekday<\/key><integer>1<\/integer>/);
-  const cron = renderCron(ctx, [job, { name: "ui", label: "com.x.ui", run: "brainlane ui", service: true, log: "/tmp/ui.log" }]);
+  const cron = renderCron(ctx, [job, { name: "ui", label: "com.x.ui", run: "company-os ui", service: true, log: "/tmp/ui.log" }]);
   assert.match(cron, /^0 8 \* \* 1 /m);
   assert.match(cron, /^@reboot /m);
 });

@@ -1,4 +1,4 @@
-// `brainlane link`: attach transcripts waiting in the inbox folder to an
+// `company-os link`: attach transcripts waiting in the inbox folder to an
 // account without a human, where that is safe. Deliberately conservative:
 //   1. Two or more distinct names from one account in the text, and that score
 //      is at least twice the runner-up → set `account:` plus a marker.
@@ -8,7 +8,7 @@
 //   2. No account name at all and it is a dictation into an editor/terminal →
 //      `account: internal` (own thinking, no customer).
 //   3. Everything in between stays open, with a proposal for the human.
-// Reversible: the marker `linked_by: brainlane link` sits in the frontmatter;
+// Reversible: the marker `linked_by: company-os link` sits in the frontmatter;
 // a human simply overwrites the line.
 //
 // `--smart` adds one headless agent run over what is still open; only "high"
@@ -26,7 +26,7 @@ import { languageName } from "./ask.mjs";
 import { postItem } from "./inbox.mjs";
 
 const PROMPTS = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts");
-const MARKER = "brainlane link";
+const MARKER = "company-os link";
 const STRONG_SOURCES = new Set(["account-folder", "finance", "tasks", "klantmap", "stripe", "trello"]);
 const WEAK_ONLY = ["pipeline", "calendar", "pijplijn", "cal.com"];
 

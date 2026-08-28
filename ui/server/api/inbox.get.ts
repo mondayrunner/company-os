@@ -1,4 +1,4 @@
-import { listItems } from "../../../core/inbox.mjs"
+import { listItems } from "#core/inbox.mjs"
 
 // The inbox: where agents talk back and the human answers.
 export default defineEventHandler(async () =>

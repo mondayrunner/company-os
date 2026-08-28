@@ -1,24 +1,24 @@
 // One place for configuration. The root is the folder that holds
-// brainlane.config.json; everything else is relative to it. Markdown in the
+// company-os.config.json; everything else is relative to it. Markdown in the
 // root is the canon; the database and the state folder are derived.
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Where brainlane itself lives; private connectors import core modules from here. */
+/** Where company-os itself lives; private connectors import core modules from here. */
 export const LIB = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export const HOME = homedir();
-export const CONFIG_FILE = "brainlane.config.json";
+export const CONFIG_FILE = "company-os.config.json";
 
 export const DEFAULTS = {
   name: "Company",
   language: "en",
-  db: ".brainlane/brain.db",
-  stateDir: "~/.local/state/brainlane",
+  db: ".company-os/brain.db",
+  stateDir: "~/.local/state/company-os",
   outputs: "outputs",
-  ignore: ["node_modules", ".git", "_archive", ".brainlane", ".obsidian"],
+  ignore: ["node_modules", ".git", "_archive", ".company-os", ".obsidian"],
   // Ordered: first match wins. `prefix` or `pattern` (regex source).
   kinds: [
     { kind: "knowledge", prefix: "knowledge/" },
@@ -59,7 +59,7 @@ export function expandHome(p) {
 
 /** Walk up from `from` until a config file is found. */
 export function findRoot(from = process.cwd()) {
-  const env = process.env.BRAINLANE_ROOT || process.env.COMPANY_OS;
+  const env = process.env.COMPANY_OS_ROOT || process.env.COMPANY_OS;
   if (env && existsSync(join(expandHome(env), CONFIG_FILE))) return expandHome(env);
   let dir = resolve(from);
   for (;;) {
@@ -84,7 +84,7 @@ function merge(base, extra) {
  */
 export function loadContext({ root: rootArg } = {}) {
   const root = rootArg ? resolve(expandHome(rootArg)) : findRoot();
-  if (!root) throw new Error(`no ${CONFIG_FILE} found here or above; run \`brainlane init\` or set BRAINLANE_ROOT`);
+  if (!root) throw new Error(`no ${CONFIG_FILE} found here or above; run \`company-os init\` or set COMPANY_OS_ROOT`);
   const file = join(root, CONFIG_FILE);
   let raw = {};
   try { raw = JSON.parse(readFileSync(file, "utf8")); } catch (e) { throw new Error(`${file}: ${e.message}`); }

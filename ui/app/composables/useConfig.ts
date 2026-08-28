@@ -1,7 +1,7 @@
 /** The public config, fetched once per session: name, locale, nav, live kinds. */
 export function useConfig() {
   const { data } = useLazyFetch<any>("/api/config", { server: false, key: "config" })
-  const cfg = computed(() => (data.value?.ok ? data.value.data : { name: "", language: "en", locale: "en-GB", title: "brainlane", logo: null, nav: [], examples: [], kinds: [] }))
+  const cfg = computed(() => (data.value?.ok ? data.value.data : { name: "", language: "en", locale: "en-GB", title: "company-os", logo: null, nav: [], examples: [], kinds: [] }))
   const locale = computed(() => cfg.value.locale)
   const fmt = {
     date: (d: string | null | undefined, opt: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" }) => (d ? new Date(d).toLocaleDateString(locale.value, opt) : ""),

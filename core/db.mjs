@@ -1,5 +1,5 @@
 // The database is an index over the markdown plus a log of what the jobs did.
-// Never the source of truth: delete it and `brainlane index` rebuilds it.
+// Never the source of truth: delete it and `company-os index` rebuilds it.
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -68,7 +68,7 @@ export function registerSource(db, connector, r) {
     .run(connector.name, connector.kind, connector.location ?? null, now(), r?.count ?? 0, r?.added ?? 0, r?.message ?? null);
 }
 
-/** Copy history (events, metrics, questions) from a database with the pre-brainlane Dutch schema. */
+/** Copy history (events, metrics, questions) from a database with the pre-company-os Dutch schema. */
 export function importLegacy(db, legacyPath) {
   const old = new DatabaseSync(legacyPath, { readOnly: true });
   const has = (t) => !!old.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(t);

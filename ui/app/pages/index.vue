@@ -72,7 +72,7 @@ const lists = useCollapsed("task-lists")
     <Panel title="Brain" api="brain" span="xl:col-span-2">
       <template #head="{ data: d }"><span v-if="d?.counts" class="text-[11px] text-ink-3 tabular">{{ d.counts.documents }} documents · {{ d.counts.relations }} relations · {{ d.counts.metricDays }} days of metrics</span></template>
       <template #default="{ data }">
-        <div v-if="data.empty" class="text-[13px] text-ink-3">No database yet. Run <code class="font-mono text-[12px]">brainlane index</code>.</div>
+        <div v-if="data.empty" class="text-[13px] text-ink-3">No database yet. Run <code class="font-mono text-[12px]">company-os index</code>.</div>
         <div v-else class="grid lg:grid-cols-[1fr_1.3fr] gap-5">
           <div>
             <p class="text-[11px] uppercase tracking-wider text-ink-3 mb-1.5">Sources</p>

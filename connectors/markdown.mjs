@@ -34,7 +34,7 @@ export default {
       const relations = [];
       const ownAccount = ctx.accountOf(rel);
       const linkedBy = String(ctx.fm(meta, "linkedBy") ?? "");
-      const automatic = /brainlane link|brain koppel/i.test(linkedBy);
+      const automatic = /company-os link|brain koppel/i.test(linkedBy);
       for (const a of [].concat(ctx.fm(meta, "account") ?? [])) {
         if (!a || a === "internal" || a === "intern" || a === "private" || a === "prive") continue;
         relations.push({ to: a, kind: "belongs-to", source: "frontmatter", confidence: automatic ? "automatic" : "confirmed" });
