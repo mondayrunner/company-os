@@ -69,6 +69,32 @@ From Anthropic's *New rules of context engineering* (2026): judgement over rules
 
 And one rule above all: **the approval gate.** Anything irreversible or outward-facing is a proposal until a human has seen the final version and said yes.
 
+## The inbox: where agents talk back
+
+Every finding, proposal and question from a check, a job or an agent becomes one markdown file in `inbox/`, fingerprinted so the same finding never lands twice. You answer in the file, in the dashboard or with `brainlane inbox reply <id> "..." --approve`; `brainlane inbox run` then executes the approved ones — a deterministic edit where the fix is mechanical, an agent run from your reply where it is not. Outward actions (send, publish, invoice) are refused by design: those stay proposals a human executes.
+
+This is the approval gate as software, and it is what every builder in the field converged on independently.
+
+## Jobs
+
+```json
+"jobs": [
+  { "name": "index", "title": "Index the vault", "run": "brainlane index", "cron": "45 7 * * 1-5" },
+  { "name": "check", "title": "Weekly checks", "run": "brainlane check", "cron": "0 8 * * 1" },
+  { "name": "ui", "title": "Dashboard", "run": "cd ui && npx nuxt dev --port 4321", "service": true }
+]
+```
+
+`brainlane jobs install` renders launchd plists (macOS), a crontab block or systemd user timers — same list, whatever the machine has. Every job gets the same status contract: a status file per run, a rotating log, and a row in the brain's event history. `brainlane jobs list` shows schedule and last result.
+
+## The dashboard
+
+`ui/` is a Nuxt app that mirrors your config: a panel per live connector kind, an inbox page, and a status page that lists every module. It is a Nuxt layer, so a private dashboard can `extends` it and add its own pages and brand. See `ui/README.md`.
+
+## MCP
+
+`brainlane serve` exposes the brain over stdio: `search`, `context`, `ask`, `live`, `check`, `inbox_post`, `inbox_list`, `status`. Register it once (`claude mcp add brainlane -- brainlane serve`) and every agent can query the brain instead of grepping — and talk back through the inbox.
+
 ## Status
 
-Early. Extracted from a working single-founder setup; the roadmap is connectors as plugins (Trello, Stripe, IMAP, calendar), an inbox where agents talk back, an MCP server, a portable scheduler, and the dashboard. MIT.
+Early, but running a real company. Extracted from a single-founder setup that has been in daily use; the parts here are the parts that survived contact with reality. MIT.
