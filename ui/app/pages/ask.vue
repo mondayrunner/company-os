@@ -1,69 +1,142 @@
 <script setup lang="ts">
-// Ask the brain. One field, one answer with sources. The index picks the
-// candidates, an agent reads them, live sources are fetched when the question
-// touches one. Read-only.
+/**
+ * Vragen aan het brein, als gesprekkenlijst.
+ *
+ * Een lang antwoord hoort niet in een overlay: je wilt terug kunnen bladeren,
+ * herlezen zonder opnieuw te betalen, en wat je gehad hebt uit het zicht kunnen
+ * schuiven. Links de vragen (nieuw bovenaan, gegroepeerd naar dag), rechts het
+ * antwoord met zijn bronnen, onderaan het veld — zoals elke chat die werkt.
+ */
 const { cfg, fmt } = useConfig()
 const { question, busy, error: fault, answer, reading, ask: run, show } = useAsk()
-const { data: log, refresh: refreshLog } = useLazyFetch<any>("/api/questions", { server: false, key: "ask-log", query: { limit: 20 } })
-const earlier = computed(() => (log.value?.ok ? log.value.data.questions : []))
-const { data: brainData } = useLazyFetch<any>("/api/brain", { server: false, key: "ask-brain" })
-const state = computed(() => (brainData.value?.ok ? brainData.value.data : null))
 
+const showArchived = ref(false)
+const search = ref("")
+const { data: log, refresh: refreshLog } = useLazyFetch<any>("/api/questions", {
+  server: false, key: "ask-log", query: computed(() => ({ limit: 100, archived: showArchived.value ? "1" : "0" })),
+})
+const all = computed<any[]>(() => (log.value?.ok ? log.value.data.questions : []))
+const threads = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  const list = q ? all.value.filter((x) => x.question.toLowerCase().includes(q) || (x.answer ?? "").toLowerCase().includes(q)) : all.value
+  // Gegroepeerd naar wanneer, want "vandaag" en "vorige week" zijn de enige
+  // twee dingen die je van een oude vraag nog weet.
+  const today = new Date().toISOString().slice(0, 10)
+  const week = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10)
+  const groups: { head: string; items: any[] }[] = [
+    { head: "Today", items: [] }, { head: "This week", items: [] }, { head: "Earlier", items: [] },
+  ]
+  for (const x of list) {
+    const d = x.ts.slice(0, 10)
+    groups[d === today ? 0 : d >= week ? 1 : 2].items.push(x)
+  }
+  return groups.filter((g) => g.items.length)
+})
+
+const openId = ref<number | null>(null)
+const current = computed(() => all.value.find((x) => x.id === openId.value) ?? null)
+
+function openThread(t: any) { openId.value = t.id; show(t) }
 async function ask(v?: string) {
-  await run((v ?? question.value).trim())
+  const q = (v ?? question.value).trim()
+  openId.value = null
+  await run(q)
+  await refreshLog()
+  const fresh = all.value.find((x) => x.question === q)
+  if (fresh) openId.value = fresh.id
+}
+async function archive(t: any, on: boolean) {
+  await $fetch("/api/questions", { method: "POST", body: { id: t.id, archived: on } })
+  if (openId.value === t.id) { openId.value = null; answer.value = null }
   refreshLog()
 }
+function newQuestion() { openId.value = null; answer.value = null; question.value = ""; fault.value = null }
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto">
-    <div class="max-w-3xl mx-auto px-6 py-8">
-      <header class="mb-5">
-        <h1 class="text-2xl font-semibold tracking-tight">
-          Ask the brain
-          <span v-if="state?.counts" class="font-henry italic font-normal text-ink-3 text-lg">{{ state.counts.documents }} documents · {{ state.counts.relations }} relations</span>
-        </h1>
-        <p class="text-[13px] text-ink-3 mt-1">
-          Answers from your own files, with a source per claim. Live sources are checked when a fact can change.
-          Usually ten to twenty seconds — and you can walk away: the answer is saved below either way.
-        </p>
-      </header>
+  <div class="h-full flex min-h-0">
+    <!-- links: de vragen -->
+    <aside class="w-72 shrink-0 border-r border-line flex flex-col min-h-0">
+      <div class="h-9 shrink-0 flex items-center gap-2 px-3 bg-header border-b border-line">
+        <button class="text-[12px] font-semibold text-ink hover:text-red transition-colors" @click="newQuestion">＋ New question</button>
+        <button
+          class="ml-auto text-[11px] transition-colors"
+          :class="showArchived ? 'text-red' : 'text-ink-3 hover:text-ink'"
+          @click="showArchived = !showArchived; openId = null"
+        >{{ showArchived ? "archived" : "archive" }}</button>
+      </div>
+      <div class="px-3 py-2 border-b border-line-soft">
+        <input v-model="search" type="search" placeholder="search questions and answers…" class="w-full text-[12px] bg-header rounded-full px-3 py-1 ring-1 ring-line text-ink placeholder:text-ink-3 focus:outline-none focus:ring-red" />
+      </div>
+      <div class="overflow-y-auto grow min-h-0">
+        <p v-if="!threads.length" class="px-3 py-4 text-[12px] text-ink-3">{{ showArchived ? "Nothing archived." : "No questions yet." }}</p>
+        <div v-for="g in threads" :key="g.head">
+          <p class="sticky top-0 z-10 px-3 py-1.5 text-[10px] uppercase tracking-wider text-ink-3 bg-header border-y border-line">{{ g.head }}</p>
+          <div
+            v-for="t in g.items"
+            :key="t.id"
+            class="group flex items-start gap-2 px-3 py-2 border-b border-line-soft cursor-pointer transition-colors"
+            :class="openId === t.id ? 'bg-red-soft' : 'hover:bg-header'"
+            @click="openThread(t)"
+          >
+            <span class="shrink-0 mt-1 size-1.5 rounded-full" :class="t.found ? 'bg-success' : 'bg-orange'" />
+            <span class="min-w-0 grow">
+              <span class="text-[12.5px] block leading-snug line-clamp-2" :class="openId === t.id ? 'text-red' : 'text-ink'">{{ t.question }}</span>
+              <span class="text-[10.5px] text-ink-3">{{ fmt.time(t.ts) }}<template v-if="t.askedBy === 'agent'"> · agent</template></span>
+            </span>
+            <button
+              class="shrink-0 text-[11px] text-ink-3 opacity-0 group-hover:opacity-100 hover:text-red transition-opacity"
+              :title="t.archived ? 'put back' : 'archive'"
+              @click.stop="archive(t, !t.archived)"
+            >{{ t.archived ? "↩" : "×" }}</button>
+          </div>
+        </div>
+      </div>
+    </aside>
 
-      <form class="flex gap-2 mb-3" @submit.prevent="ask()">
-        <input v-model="question" class="flex-1 text-[14px] bg-card ring-1 ring-line rounded-xl px-4 py-2.5 focus:outline-none focus:ring-ink-3" placeholder="Ask about customers, prices, strategy, pipeline…" :disabled="busy" />
-        <button class="text-[13px] px-4 py-2 rounded-xl bg-red text-white disabled:opacity-50 hover:bg-red-hover transition-colors" :disabled="busy || question.trim().length < 3">{{ busy ? "thinking…" : "Ask" }}</button>
+    <!-- rechts: het gesprek -->
+    <section class="grow min-h-0 flex flex-col">
+      <div class="grow min-h-0 overflow-y-auto">
+        <div class="max-w-2xl mx-auto px-8 py-8">
+          <!-- niets open: uitleg en voorbeelden -->
+          <template v-if="!answer && !busy">
+            <h1 class="text-2xl font-semibold tracking-tight mb-2">Ask the brain</h1>
+            <p class="text-[13.5px] text-ink-3 leading-relaxed mb-6">
+              Answers from your own files, with a source per claim. Live sources are checked when a fact can change.
+              Ten to twenty seconds, and you can walk away: every answer is saved on the left.
+            </p>
+            <div v-if="cfg.examples.length" class="flex flex-wrap gap-1.5">
+              <button v-for="v in cfg.examples" :key="v" class="text-[11.5px] px-2.5 py-1 rounded-full ring-1 ring-line text-ink-3 hover:text-ink hover:ring-ink-3 transition-colors" @click="ask(v)">{{ v }}</button>
+            </div>
+          </template>
+
+          <!-- de vraag -->
+          <p v-if="answer || busy" class="text-[15px] font-semibold text-ink leading-snug mb-4">{{ question }}</p>
+
+          <div v-if="busy" class="rounded-2xl ring-1 ring-line bg-card p-5"><AskProgress :reading="reading" /></div>
+          <p v-if="fault" class="text-[13px] text-red">{{ fault }}</p>
+
+          <article v-if="answer && !busy" class="rounded-2xl ring-1 ring-line bg-card p-6">
+            <AnswerBody :text="answer.answer" />
+            <AnswerSources :sources="answer.sources" :live="answer.live" />
+            <div class="mt-3 pt-2 border-t border-line-soft flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-3">
+              <span :class="answer.found ? 'text-success' : 'text-orange'">{{ answer.found ? "found" : "not found in the brain" }}</span>
+              <span v-if="answer.saved">saved answer, no new run</span>
+              <span v-if="answer.duration">{{ (answer.duration / 1000).toFixed(0) }} s</span>
+              <span v-if="answer.cost != null">${{ answer.cost.toFixed(3) }}</span>
+              <button v-if="current" class="ml-auto hover:text-ink" @click="ask(current.question)">ask again ↻</button>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- onderaan: het veld, zoals in elke chat -->
+      <form class="shrink-0 border-t border-line bg-header/60 px-8 py-3" @submit.prevent="ask()">
+        <div class="max-w-2xl mx-auto flex gap-2">
+          <input v-model="question" class="flex-1 text-[14px] bg-card ring-1 ring-line rounded-xl px-4 py-2.5 focus:outline-none focus:ring-ink-3" placeholder="Ask about customers, prices, strategy, pipeline…" :disabled="busy" />
+          <button class="text-[13px] px-4 py-2 rounded-xl bg-red text-white disabled:opacity-50 hover:bg-red-hover transition-colors" :disabled="busy || question.trim().length < 3">{{ busy ? "…" : "Ask" }}</button>
+        </div>
       </form>
-
-      <div v-if="!answer && !busy && cfg.examples.length" class="flex flex-wrap gap-1.5 mb-6">
-        <button v-for="v in cfg.examples" :key="v" class="text-[11px] px-2.5 py-1 rounded-full ring-1 ring-line text-ink-3 hover:text-ink hover:ring-ink-3 transition-colors" @click="ask(v)">{{ v }}</button>
-      </div>
-
-      <div v-if="busy" class="rounded-2xl ring-1 ring-line bg-card p-5 mb-6"><AskProgress :reading="reading" /></div>
-      <p v-if="fault" class="text-[13px] text-red mb-4">{{ fault }}</p>
-
-      <article v-if="answer" class="rounded-2xl ring-1 ring-line bg-card p-6 mb-4">
-        <AnswerBody :text="answer.answer" />
-        <AnswerSources :sources="answer.sources" :live="answer.live" />
-        <div class="mt-3 pt-2 border-t border-line-soft flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-3">
-          <span :class="answer.found ? 'text-success' : 'text-orange'">{{ answer.found ? "found" : "not found in the brain" }}</span>
-          <span v-if="answer.saved" class="text-ink-3">saved answer</span>
-          <span v-if="answer.duration">{{ (answer.duration / 1000).toFixed(0) }} s</span><span v-if="answer.cost != null">${{ answer.cost.toFixed(3) }}</span>
-        </div>
-        <details v-if="answer.candidates?.length" class="mt-2">
-          <summary class="text-[11px] text-ink-3 cursor-pointer">Candidates from the index ({{ answer.candidates.length }})</summary>
-          <ul class="mt-1 text-[11px] text-ink-3 font-mono"><li v-for="k in answer.candidates" :key="k.path + k.heading">{{ k.path }} <span class="opacity-70">· {{ k.heading }}</span></li></ul>
-        </details>
-      </article>
-
-      <div v-if="earlier.length" class="mb-6">
-        <p class="text-[11px] uppercase tracking-wider text-ink-3 mb-1.5">Asked before <span class="normal-case tracking-normal">· click to read the saved answer, no new run</span></p>
-        <div v-for="g in earlier" :key="g.ts" class="flex items-baseline gap-2 py-0.5 group">
-          <span class="shrink-0" :class="g.found ? 'text-success' : 'text-orange'">●</span>
-          <button class="text-left text-[12px] text-ink-2 hover:text-ink truncate grow" :disabled="!g.answer" @click="show(g)">{{ g.question }}</button>
-          <span class="text-ink-3 text-[11px] shrink-0 tabular">{{ g.ts.slice(5, 10) }}<template v-if="g.askedBy === 'agent'"> · agent</template></span>
-          <button class="text-[11px] text-ink-3 opacity-0 group-hover:opacity-100 hover:text-red shrink-0" title="ask again" @click="ask(g.question)">↻</button>
-        </div>
-      </div>
-    </div>
+    </section>
   </div>
 </template>

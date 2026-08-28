@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS metrics (
 );
 CREATE TABLE IF NOT EXISTS questions (
   id INTEGER PRIMARY KEY, ts TEXT NOT NULL, question TEXT NOT NULL, answer TEXT,
-  sources TEXT, found INTEGER, cost_usd REAL, duration_ms INTEGER, asked_by TEXT
+  sources TEXT, found INTEGER, cost_usd REAL, duration_ms INTEGER, asked_by TEXT,
+  archived INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS inbox (
   id TEXT PRIMARY KEY, path TEXT NOT NULL, kind TEXT, sender TEXT, created TEXT,
@@ -56,6 +57,11 @@ export function openDb(ctx, { readonly = false } = {}) {
   if (!readonly) {
     db.exec("PRAGMA journal_mode=WAL");
     db.exec(SCHEMA);
+    // Bestaande databases bijwerken. `CREATE TABLE IF NOT EXISTS` raakt een tabel
+    // die er al staat niet aan, dus nieuwe kolommen moeten hier langs.
+    for (const alter of ["ALTER TABLE questions ADD COLUMN archived INTEGER DEFAULT 0"]) {
+      try { db.exec(alter); } catch { /* kolom bestaat al */ }
+    }
   }
   return db;
 }

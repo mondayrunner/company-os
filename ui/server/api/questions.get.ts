@@ -7,11 +7,14 @@ export default defineEventHandler(async (event) =>
     const d = brain()
     if (!d) return { questions: [] }
     const limit = Math.min(Number(getQuery(event).limit) || 20, 100)
+    const archived = getQuery(event).archived === "1"
     const rows = d.prepare(
-      "SELECT ts, question, answer, sources, found, cost_usd, duration_ms, asked_by FROM questions ORDER BY ts DESC LIMIT ?",
-    ).all(limit) as any[]
+      `SELECT id, ts, question, answer, sources, found, cost_usd, duration_ms, asked_by, archived
+       FROM questions WHERE COALESCE(archived, 0) = ? ORDER BY ts DESC LIMIT ?`,
+    ).all(archived ? 1 : 0, limit) as any[]
     return {
       questions: rows.map((r) => ({
+        id: r.id, archived: !!r.archived,
         ts: r.ts, question: r.question, answer: r.answer, found: !!r.found,
         sources: JSON.parse(r.sources || "[]"), cost: r.cost_usd, duration: r.duration_ms, askedBy: r.asked_by,
       })),
