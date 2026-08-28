@@ -1,0 +1,25 @@
+{
+  "name": "Fixture Co",
+  "language": "en",
+  "db": ".brainlane/brain.db",
+  "stateDir": ".brainlane/state",
+  "outputs": "outputs",
+  "kinds": [
+    { "kind": "knowledge", "prefix": "knowledge/" },
+    { "kind": "account", "pattern": "^accounts/(leads|customers)/[^/]+/" },
+    { "kind": "pipeline", "prefix": "pipeline/" },
+    { "kind": "transcript", "prefix": "transcripts/" }
+  ],
+  "accounts": { "root": "accounts", "sides": ["leads", "customers"], "openSides": ["leads"], "wonSides": ["customers"], "statusFile": "STATUS.md", "ballLine": "**Ball with:**" },
+  "pipeline": {
+    "file": "pipeline/pipeline.md", "updateLine": "Last update", "logHeading": "## Log",
+    "leads": { "heading": "## Active leads", "columns": ["since", "who", "stage", "action", "ball"], "who": "who", "ball": "ball", "action": "action" },
+    "ballSelf": ["me", "us"]
+  },
+  "checks": {
+    "knowledge": { "dir": "knowledge", "slaDays": 60 },
+    "docs": ["CLAUDE.md"],
+    "copiedFigures": { "patterns": ["MRR", "ARR"], "currency": "€", "excludeHeadings": ["Log"] }
+  },
+  "connectors": { "markdown": {}, "status": {} }
+}

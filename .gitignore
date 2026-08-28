@@ -1,0 +1,5 @@
+node_modules/
+.brainlane/
+*.db
+*.db-*
+.DS_Store
