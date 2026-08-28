@@ -23,9 +23,13 @@ export default {
         if (days > sla && !/SUPERSEDED/i.test(String(status))) out.push({ severity: "warn", where: rel, what: `last_verified ${verified} is ${days} days old (SLA ${sla})` });
       }
       for (const s of [].concat(ctx.fm(meta, "sources") ?? [])) {
-        const p = String(s).startsWith("~/") ? String(s) : String(s).replace(/^\.\.\//, "");
-        const abs = p.startsWith("~/") ? p.replace("~", ctx.home) : p.startsWith("/") ? p : ctx.path(p);
-        if (!(await h.exists(abs)) && !(await h.exists(ctx.path(`${dir}/${p}`)))) out.push({ severity: "error", where: rel, what: `source does not exist: ${s}` });
+        let p = String(s).replace(/\s*\(.*\)\s*$/, "").trim();   // "folder/ (all files)" → "folder/"
+        if (!p || /\s/.test(p) || /^https?:/.test(p)) continue;    // prose or a URL, not a path
+        p = p.startsWith("~/") ? p.replace("~", ctx.home) : p.replace(/^\.\.\//, "");
+        const candidates = p.startsWith("/") ? [p] : [ctx.path(p), ctx.path(`${dir}/${p}`), ctx.path(`../${p}`)];
+        let found = false;
+        for (const c of candidates) if (await h.exists(c)) { found = true; break; }
+        if (!found) out.push({ severity: "error", where: rel, what: `source does not exist: ${s}` });
       }
     }
     return out;

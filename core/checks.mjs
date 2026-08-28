@@ -79,6 +79,22 @@ export function makeHelpers(ctx, db, connectors) {
       cache.set("leads", rows);
       return rows;
     },
+    /** First cell of every table row in the pipeline file: who each row is about. */
+    pipelineNames: async () => {
+      if (cache.has("names")) return cache.get("names");
+      const p = ctx.config.pipeline;
+      const text = p?.file ? await h.read(p.file).catch(() => "") : "";
+      const names = [];
+      for (const line of text.split("\n")) {
+        if (!line.trim().startsWith("|") || /^\s*\|?[\s:|-]+\|?\s*$/.test(line)) continue;
+        const cells = line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(clean);
+        // the "who" cell is the first one that is not a date or a number
+        const who = cells.find((c) => c && !/^\d{4}-\d\d(-\d\d)?$/.test(c) && !/^[\d.,€ ]+$/.test(c));
+        if (who) names.push(who);
+      }
+      cache.set("names", names);
+      return names;
+    },
     live: async (kind, query) => {
       const c = byKind(connectors, kind).find((c) => c.live);
       if (!c) return null;

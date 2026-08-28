@@ -4,6 +4,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/** Where brainlane itself lives; private connectors import core modules from here. */
+export const LIB = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export const HOME = homedir();
 export const CONFIG_FILE = "brainlane.config.json";
@@ -80,7 +84,7 @@ export function loadContext({ root: rootArg } = {}) {
   const accountRe = new RegExp(`^(${config.accounts.root}/${sides}[^/]+)`);
   return {
     root, config, configFile: file, path,
-    home: HOME,
+    home: HOME, lib: LIB,
     dbPath: path(config.db),
     stateDir: path(expandHome(config.stateDir)),
     outputs: path(config.outputs),

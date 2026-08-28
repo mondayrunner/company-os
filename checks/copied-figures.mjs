@@ -1,5 +1,5 @@
 // Figures that live in a system of record (MRR, ARR) must not be copied into
-// markdown outside log sections: a copy is a second system that starts ageing
+// markdown (where a current figure would live: pipeline, knowledge) outside log sections: a copy is a second system that starts ageing
 // immediately. Configure: checks.copiedFigures = { patterns, currency,
 // exclude: [path prefixes], excludeHeadings: ["Log"] }.
 import { sections } from "../core/markdown.mjs";
@@ -15,7 +15,8 @@ export default {
     const excludeHeadings = (cfg.excludeHeadings ?? ["Log", "Changelog", "History"]).map((s) => s.toLowerCase());
     const re = new RegExp(`\\b(${patterns.join("|")})\\b`);
     const out = [];
-    const docs = h.db.prepare("SELECT path FROM documents WHERE kind IN ('pipeline','knowledge','account','other')").all();
+    const kinds = cfg.kinds ?? ["pipeline", "knowledge"];   // accounts hold dated decisions, not a current stand
+    const docs = h.db.prepare(`SELECT path FROM documents WHERE kind IN (${kinds.map(() => "?").join(",")})`).all(...kinds);
     for (const { path } of docs) {
       if (exclude.some((e) => path.startsWith(e))) continue;
       const text = await h.read(path).catch(() => null);

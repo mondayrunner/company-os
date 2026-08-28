@@ -20,7 +20,9 @@ export default {
       if (!f) out.push({ severity: "warn", where: p.file, line: r._line, what: `lead "${who}" has no account folder`, text: Object.values(r).join(" ") });
       else matched.add(f);
     }
-    for (const f of open) if (!matched.has(f)) out.push({ severity: "warn", where: f, what: "open account folder without a row in the leads table" });
+    // A folder is covered when any table in the pipeline file names it (leads, wins, losses, commitments).
+    const names = await h.pipelineNames();
+    for (const f of open) if (!matched.has(f) && !names.some((n) => h.matchFolder(n, [f]))) out.push({ severity: "warn", where: f, what: "open account folder without a row in any pipeline table" });
     return out;
   },
 };

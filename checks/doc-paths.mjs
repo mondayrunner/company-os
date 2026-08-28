@@ -4,6 +4,12 @@ import { dirname, join } from "node:path";
 import { stat, readdir } from "node:fs/promises";
 
 const exists = async (p) => !!(await stat(p).catch(() => null));
+const subdirCache = new Map();
+async function existsInSubdir(dir, p) {
+  if (!subdirCache.has(dir)) subdirCache.set(dir, (await readdir(dir, { withFileTypes: true }).catch(() => [])).filter((d) => d.isDirectory() && !d.name.startsWith(".")).map((d) => d.name));
+  for (const sub of subdirCache.get(dir)) if (await exists(join(dir, sub, p))) return true;
+  return false;
+}
 
 export default {
   name: "doc-paths",
@@ -22,19 +28,21 @@ export default {
       for (let i = 0; i < lines.length; i++) {
         for (const m of lines[i].matchAll(/`([^`\n]+)`/g)) {
           const raw = m[1];
-          if (!/[\/.]/.test(raw) || /\s/.test(raw) || /^https?:/.test(raw) || /[{*<>]|YYYY|<[a-z]+>/i.test(raw)) continue;
+          if (!/[\/.]/.test(raw) || /\s/.test(raw) || /^https?:/.test(raw) || /^\[\[/.test(raw) || /[{*<>]|YYYY|<[a-z]+>/i.test(raw)) continue;
+          if (/^[a-z0-9-]+\.[a-z]{2,}\//i.test(raw)) continue; // domain/path, not a file
           if (/^(npm|node|bash|git|launchctl|curl|cd|ls|cp|ln|npx|claude|python3|source|brainlane)\b/.test(raw)) continue;
           let p = raw.replace(/[),.;:]+$/, "").replace(/:\d+(-\d+)?$/, "");
           let target = null, absolute = false;
           if (p.startsWith("~/")) { target = join(ctx.home, p.slice(2)); absolute = true; }
-          else if (p.startsWith("/")) { target = p; absolute = true; }
+          else if (p.startsWith("/")) { if (!/^\/(Users|home|opt|etc|var|tmp|usr|Volumes)\//.test(p)) continue; target = p; absolute = true; }
           else if (p.startsWith("./")) target = join(dirname(abs), p.slice(2));
           else {
             const head = p.split("/")[0];
             if (rootDirs.has(head)) target = join(ctx.root, p);
             else if (parentDirs.has(head)) target = join(ctx.root, "..", p);
             else if (await exists(join(dirname(abs), p)) || await exists(join(ctx.root, p))) continue;
-            else if (p.includes("/")) target = join(ctx.root, p); // unknown top-level folder: a dead path
+            else if (await existsInSubdir(dirname(abs), p) || await existsInSubdir(ctx.root, p)) continue; // one level down, contextual
+            else if (p.includes("/") && /\.[a-z0-9]+$|\/$/i.test(p)) target = join(ctx.root, p); // file-like under an unknown folder: dead
             else continue;
           }
           if (seen.has(target)) continue;
