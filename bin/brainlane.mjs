@@ -9,6 +9,7 @@
 //   brainlane ask "<question>"       answer with sources via a headless agent
 //   brainlane link [--dry-run] [--smart]   attach waiting transcripts to accounts
 //   brainlane check [--no-live] [--only a,b] [--json]   deterministic checks, report + status
+//   brainlane live <kind> [what]     read one live source now (tasks, finance, calendar, mail)
 //   brainlane status                 what is in the brain, which sources were scanned
 //   brainlane import-legacy <db>     copy events/metrics/questions from a pre-brainlane db
 //   brainlane init [--language xx]   write a starter brainlane.config.json here
@@ -24,6 +25,7 @@ import { recordEvent } from "../core/status.mjs";
 import { ask } from "../core/ask.mjs";
 import { link, linkSmart } from "../core/link.mjs";
 import { runChecks } from "../core/checks.mjs";
+import { loadConnectors, byKind } from "../core/connectors.mjs";
 
 const argv = process.argv.slice(2);
 const flags = {};
@@ -78,6 +80,16 @@ try {
       if (flags.json) out(r); else { const { readFileSync } = await import("node:fs"); console.log(readFileSync(r.report, "utf8")); }
       break;
     }
+    case "live": {
+      // brainlane live <kind> [what] [key=value…]: inference-time retrieval from one connector
+      const [kind, what, ...kv] = rest;
+      const connectors = await loadConnectors(ctx);
+      const c = byKind(connectors, kind).find((x) => x.live);
+      if (!c) { console.error(`no live connector of kind "${kind}" (have: ${connectors.filter((x) => x.live).map((x) => `${x.name}:${x.kind}`).join(", ") || "none"})`); process.exit(1); }
+      const query = { what, ...Object.fromEntries(kv.map((p) => p.split("=")).filter(([k, v]) => k && v)) };
+      out({ connector: c.name, ...(await c.live(query, ctx, c.options)) });
+      break;
+    }
     case "import-legacy": out(importLegacy(db, rest[0])); break;
     default: console.error(`unknown command: ${cmd}\n`); console.log(help()); process.exit(1);
   }
@@ -95,6 +107,7 @@ function help() {
   ask "<question>" [--json]  answer with sources via a headless agent
   link [--dry-run] [--smart] attach waiting transcripts to accounts
   check [--no-live] [--only a,b] [--json]   deterministic checks → report + status
+  live <kind> [what] [k=v]   read a live source now (tasks cards, finance subscriptions, calendar today, mail unread)
   status                     what is in the brain
   import-legacy <db>         copy history from a pre-brainlane database
   init [--language xx] [--name "..."]   starter config in the current folder

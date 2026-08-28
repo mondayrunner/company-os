@@ -55,7 +55,9 @@ export default {
 }
 ```
 
-Built-in: `markdown`, `status`, `metrics-http`. Private ones go in `<vault>/connectors/<name>.mjs` and are found first — no fork needed. There is deliberately no `write()`.
+Built-in: `markdown`, `status`, `metrics-http`, `stripe` (finance), `trello` and `tasks-markdown` (tasks — same item shape, so they are interchangeable), `ics-calendar` (calendar), `imap` (mail; works with Proton Mail Bridge). Private ones go in `<vault>/connectors/<name>.mjs` and are found first — no fork needed. There is deliberately no `write()`.
+
+`volatile: true` means: read live (`brainlane live finance subscriptions`), snapshot a few numbers daily (`brainlane snapshot`), never copy into markdown. Secrets come from an env file the connector names (`"envFile": "~/.config/finance/.env"`), never from the vault.
 
 ## Checks are plugins too
 

@@ -1,11 +1,14 @@
-// `brainlane index`: run every non-metric connector, write documents, chunks,
-// relations and events. Only changed files are rewritten. Connectors that
-// produce files (transcripts) run before `markdown` so the scan picks them up.
+// `brainlane index`: run the connectors that read files and logs (not the
+// volatile, live ones), write documents, chunks, relations and events. Only
+// changed files are rewritten. Connectors that produce files (transcripts) run
+// before `markdown` so the scan picks them up. `brainlane snapshot` runs the
+// volatile connectors (finance, tasks, calendar, mail, dashboard metrics) once
+// a day for history; nothing from them is ever copied into markdown.
 import { now, registerSource } from "./db.mjs";
 import { loadConnectors } from "./connectors.mjs";
 
 export async function indexAll(ctx, db, { only = null } = {}) {
-  const connectors = await loadConnectors(ctx, (c) => c.kind !== "metrics" && (!only || only.includes(c.name)));
+  const connectors = await loadConnectors(ctx, (c) => !isLive(c) && (!only || only.includes(c.name)));
   const order = [...connectors].sort((a, b) => (a.producesFiles === b.producesFiles ? 0 : a.producesFiles ? -1 : 1));
   const report = {};
   for (const c of order) {
@@ -71,9 +74,11 @@ export function writeMetrics(db, metrics) {
   return metrics.length;
 }
 
-/** `brainlane snapshot`: only the metric connectors (slow, live sources). */
+const isLive = (c) => c.volatile || c.kind === "metrics";
+
+/** `brainlane snapshot`: only the live connectors, one row of metrics per day. */
 export async function snapshotAll(ctx, db) {
-  const connectors = await loadConnectors(ctx, (c) => c.kind === "metrics");
+  const connectors = await loadConnectors(ctx, isLive);
   const report = {};
   for (const c of connectors) {
     if (c.error) { report[c.name] = { error: c.error }; continue; }
