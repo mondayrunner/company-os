@@ -16,7 +16,7 @@ const problems = computed(() => {
 <template>
   <div v-if="problems.length" class="px-5 py-2 bg-red-soft border-b border-line flex items-center gap-3 flex-wrap">
     <span class="size-2 rounded-full bg-red shrink-0" />
-    <span class="text-[13px] text-red font-medium">{{ problems.length }} job{{ problems.length === 1 ? "" : "s" }} need attention</span>
+    <span class="text-[13px] text-red font-medium">{{ problems.length }} job{{ problems.length === 1 ? " needs" : "s need" }} attention</span>
     <span v-for="p in problems" :key="p" class="text-[12px] text-ink-2">· {{ p }}</span>
     <NuxtLink to="/status" class="ml-auto text-[12px] text-red hover:underline shrink-0">see status</NuxtLink>
   </div>

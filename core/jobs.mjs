@@ -220,7 +220,14 @@ export async function rotateLog(file, max = 2 * 1024 * 1024) {
   if (st && st.size > max) { await rename(file, `${file}.1`); await writeFile(file, `${new Date().toISOString()} · log rotated (previous in ${file.split("/").pop()}.1)\n`); }
 }
 
-/** Run one job now with the status contract: the job's own status wins; otherwise we write one from the exit code. */
+/**
+ * Run one job now under the status contract.
+ *
+ * The job's own status always wins. We only write one ourselves when the job
+ * failed, or when it has never written a status at all — a job that exits 0
+ * without touching its status is skipping on purpose (the daily plan already
+ * exists, say), and overwriting that would erase the morning's real result.
+ */
 export async function runJob(ctx, name) {
   const job = jobsOf(ctx).find((j) => j.name === name);
   if (!job) throw new Error(`no job named ${name}`);
@@ -235,7 +242,10 @@ export async function runJob(ctx, name) {
     p.on("error", () => resolve(127));
   });
   const after = (await stat(statusFile).catch(() => null))?.mtimeMs ?? 0;
-  if (after <= before) await writeStatus(ctx, name, { result: code === 0 ? "ok" : "error", done: code === 0 ? 1 : 0, failed: code === 0 ? 0 : 1, message: `exit ${code} after ${Math.round((Date.now() - started) / 1000)}s (no status written by the job)` });
+  const wroteNothing = after <= before;
+  const seconds = Math.round((Date.now() - started) / 1000);
+  if (wroteNothing && code !== 0) await writeStatus(ctx, name, { result: "error", done: 0, failed: 1, message: `exit ${code} after ${seconds}s (the job wrote no status)` });
+  else if (wroteNothing && !before) await writeStatus(ctx, name, { result: "ok", done: 1, failed: 0, message: `exit 0 after ${seconds}s (the job writes no status of its own)` });
   return code;
 }
 

@@ -33,7 +33,7 @@ async function run(name: string) {
         <div class="size-9 rounded-full mx-auto mb-4 flex items-center justify-center text-white text-[17px]" :class="busy && !jobs.length ? 'bg-ink-3 animate-pulse' : broken ? 'bg-red' : 'bg-success'">{{ busy && !jobs.length ? "" : broken ? "!" : "✓" }}</div>
         <h1 class="text-2xl font-semibold tracking-tight">
           <template v-if="busy && !jobs.length">Checking…</template>
-          <template v-else-if="broken">{{ broken }} job{{ broken === 1 ? "" : "s" }} need attention</template>
+          <template v-else-if="broken">{{ broken }} job{{ broken === 1 ? " needs" : "s need" }} attention</template>
           <template v-else>Everything is running</template>
         </h1>
         <p v-if="modules" class="text-[13px] text-ink-3 mt-1.5">
