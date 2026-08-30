@@ -9,8 +9,10 @@ import { dirname } from "node:path"
  * between a dashboard you open and one you avoid. So: fresh cache → return it;
  * stale cache → return it and refetch in the background; no cache → wait once.
  *
- * `key` is what the cache is *about* (a year, a currency). Changes it and the
+ * `key` is what the cache is *about* (a year, a currency). Change it and the
  * old file is ignored rather than silently served for the wrong thing.
+ *
+ * No base route uses this; a layer's slow route wraps its fetcher in it.
  */
 const running = new Map<string, Promise<unknown>>()
 

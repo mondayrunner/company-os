@@ -2,9 +2,10 @@
 /**
  * One line that answers "how are we doing" before you read anything else.
  *
- * It reuses the panels' own fetch keys, so it costs no extra requests: the
- * strip and the panel below it are the same data, shown twice at two levels
- * of detail. Only stats whose connector exists are shown.
+ * Finance, tasks, mail and inbox reuse the panels' own fetch keys, so they cost
+ * no extra requests: the strip and the panel below it are the same data, shown
+ * twice at two levels of detail. System has its own request. Only stats whose
+ * connector exists are shown.
  */
 const { cfg, fmt } = useConfig()
 const has = (k: string) => cfg.value.kinds?.includes(k)
@@ -27,7 +28,7 @@ const stats = computed(() => {
   if (i) out.push({ label: "Inbox", value: String(i.open.length), note: i.approved.length ? `${i.approved.length} approved` : "waiting for you", tone: i.open.length ? "warn" : "good", to: "/inbox" })
   if (s) {
     const bad = s.jobs.filter((j: any) => j.state === "error" || j.stale).length
-    out.push({ label: "Jobs", value: bad ? String(bad) : "ok", note: bad ? "need attention" : `${s.jobs.length} running`, tone: bad ? "bad" : "good", to: "/status" })
+    out.push({ label: "Jobs", value: bad ? String(bad) : "ok", note: bad ? "need attention" : `${s.jobs.length} scheduled`, tone: bad ? "bad" : "good", to: "/status" })
   }
   return out
 })

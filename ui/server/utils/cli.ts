@@ -4,8 +4,9 @@ import { join } from "node:path"
 const exec = promisify(execFile)
 
 /**
- * Run the company-os CLI (same repo) for the commands that write or take long:
- * inbox, jobs run. Output is JSON.
+ * Run the company-os CLI (same repo) for the short writes a page waits for:
+ * inbox reply, approve, reject. Long runs (inbox run, jobs run) are spawned
+ * detached in their own routes. Output is JSON.
  */
 export async function cli(args: string[], timeoutMs = 300000) {
   const bin = join(ctx().lib, "bin", "company-os.mjs")

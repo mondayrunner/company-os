@@ -38,8 +38,9 @@ tool knew the board's list ids.
    what an agent did.
 5. *The UI is a view.* It polls `/api/version` (max of newest event, inbox
    file, job status) every 3 s and refetches when it moves. The "fix with AI"
-   and kickstart routes are gone: an agent with Write+Bash over the vault
-   behind an unauthenticated button was the worst of the review's P0s.
+   route is gone: an agent with Write+Bash over the vault behind an
+   unauthenticated button was the worst of the review's P0s. Kickstart came
+   back, restricted to job names from the config.
 
 **Measured** (real vault, 1,130 documents): `account` 11 ms / 7 KB;
 `search` 24–50 ms / 3.4 KB, 8 of 8 hits from the right folder; `accounts` 23 ms;

@@ -11,6 +11,8 @@
  * inbox and a human.
  */
 import { createInterface } from "node:readline";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { search, status } from "../core/search.mjs";
 import { account, accounts, canon } from "../core/brief.mjs";
 import { finance, tasks, calendar, mail } from "../core/live.mjs";
@@ -21,6 +23,8 @@ import { postItem, listItems } from "../core/inbox.mjs";
 
 // Descriptions are written for an agent that has never seen this company:
 // when to use the tool, what comes back, what to do next.
+const VERSION = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8")).version;
+
 export const TOOLS = [
   { name: "account", description: "What is going on with one client, lead or partner. Give any part of the name (\"harper\", \"northwind\") or the folder path. Returns the status file (first sections, capped), who holds the ball, the pipeline row and recent log lines, open commitments, the last contact moment and the newest files. Use this before anything else about an account; use `full: true` only when the head is not enough.", inputSchema: { type: "object", properties: { account: { type: "string", description: "name fragment or folder path" }, full: { type: "boolean", default: false }, maxChars: { type: "number", default: 3000 } }, required: ["account"] } },
   { name: "accounts", description: "One line per open and won account: name, side, who holds the ball, stage, next action, last touch. Use it to see the whole pipeline at once or to find the right account before calling `account`.", inputSchema: { type: "object", properties: { side: { type: "string", description: "one side only, e.g. acquisition or clients" } } } },
@@ -35,7 +39,7 @@ export const TOOLS = [
   { name: "mail_draft", description: "File a draft in the mail client's Drafts folder: to, subject, body (plain text; you write it, this only files it). Replaces an earlier draft with the same subject to the same address. Never sends — the human does that from the mail client.", inputSchema: { type: "object", properties: { to: { type: "string" }, subject: { type: "string" }, body: { type: "string" } }, required: ["to", "subject", "body"] } },
   { name: "live", description: "Read a live source now: kind = tasks (what: cards) | finance (subscriptions, open-invoices) | calendar (today, range from/to) | mail (unread). Never copy these numbers into markdown.", inputSchema: { type: "object", properties: { kind: { type: "string" }, what: { type: "string" }, from: { type: "string" }, to: { type: "string" }, limit: { type: "number" } }, required: ["kind"] } },
   { name: "check", description: "Run the deterministic checks (stale pages, dead links, pipeline drift, copied figures, subscriptions vs accounts, silent jobs). Findings become inbox items.", inputSchema: { type: "object", properties: { live: { type: "boolean", default: true } } } },
-  { name: "inbox_post", description: "Talk back to the human: post a question, proposal or finding to the inbox. The human replies there; approved items are executed by `company-os inbox run`.", inputSchema: { type: "object", properties: { kind: { type: "string", enum: ["question", "proposal", "drift", "report"] }, title: { type: "string" }, body: { type: "string" }, action: { type: "object", description: "optional: {type: edit-markdown|set-frontmatter|move-file|agent, …}" } }, required: ["title", "body"] } },
+  { name: "inbox_post", description: "Talk back to the human: post a question, proposal or finding to the inbox. The human replies there; approval runs the item (from the dashboard at once, from the CLI via `company-os inbox run`).", inputSchema: { type: "object", properties: { kind: { type: "string", enum: ["question", "proposal", "drift", "report"] }, title: { type: "string" }, body: { type: "string" }, action: { type: "object", description: "optional: {type: edit-markdown|set-frontmatter|move-file|agent, …}" } }, required: ["title", "body"] } },
   { name: "inbox_list", description: "List inbox items, optionally by status (open, approved, rejected, done, failed).", inputSchema: { type: "object", properties: { status: { type: "string" } } } },
   { name: "status", description: "What is in the brain: counts, sources, latest runs.", inputSchema: { type: "object", properties: {} } },
 ];
@@ -79,7 +83,7 @@ export function serve(ctx, db) {
     const reply = (result) => id !== undefined && send({ jsonrpc: "2.0", id, result });
     const fail = (code, message) => id !== undefined && send({ jsonrpc: "2.0", id, error: { code, message } });
     try {
-      if (method === "initialize") reply({ protocolVersion: params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "company-os", version: "0.2.0" } });
+      if (method === "initialize") reply({ protocolVersion: params?.protocolVersion ?? "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "company-os", version: VERSION } });
       else if (method === "notifications/initialized" || method?.startsWith("notifications/")) { /* no reply */ }
       else if (method === "ping") reply({});
       else if (method === "tools/list") reply({ tools: TOOLS });

@@ -14,7 +14,7 @@ One place per fact. Link to it, never copy it.
 | Company details | `company.md` |
 | Status of one account | `accounts/<side>/<id>/STATUS.md` |
 | Pipeline, commitments, who holds the ball | `pipeline/pipeline.md` |
-| Tasks | `tasks.md` (read live, never copied into markdown) |
+| Tasks | `tasks.md` (read through the `tasks` tool) |
 
 ## Brain first, then grep
 

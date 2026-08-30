@@ -3,9 +3,9 @@
  *
  * An item's status lives in its markdown, because that is a fact about the item
  * and git should keep it. "Someone is working on this" is not that: it is a
- * fact about this machine at this moment, it is meaningless after a restart,
- * and it must not survive `company-os index`. So it lives in the database,
- * which is allowed to be thrown away.
+ * fact about this machine at this moment and it is meaningless after a
+ * restart: rows whose process is gone are swept on every read. So it lives in
+ * the database, which is allowed to be thrown away.
  *
  * Without it the dashboard cannot tell the difference between a run that is
  * still going and one that never started: the item sits at `approved` either
@@ -60,7 +60,7 @@ export function finish(ctx, item) {
 /**
  * Write a finished run into the event log. Jobs already do this through
  * `company-os event`; this is the same row for work that has no job behind it —
- * an inbox item you ran, a role you pointed at a card, a draft you asked for.
+ * an inbox item you ran, a draft you asked for.
  * Without it those runs happen and leave no trace anywhere you can look.
  */
 export function record(ctx, { job, result = "ok", done = 1, failed = 0, message = "", cost = null } = {}) {

@@ -1,7 +1,7 @@
 import { DatabaseSync } from "node:sqlite"
 import { existsSync } from "node:fs"
 
-/** Read access to the brain database. Writing is the CLI's job (index, snapshot, inbox run). */
+/** The brain database for the panels. The index is the CLI's job; the only rows written from here are `running`/`events` for runs started on this page, through core/running.mjs. */
 let db: DatabaseSync | null = null
 export function brain(): DatabaseSync | null {
   const path = ctx().dbPath

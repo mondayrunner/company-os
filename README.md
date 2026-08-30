@@ -99,7 +99,7 @@ Every finding and proposal is one markdown file in `inbox/`, fingerprinted so th
 claude mcp add company-os -e COMPANY_OS_ROOT=/path/to/your/folder -- company-os serve
 ```
 
-Reading: `account`, `accounts`, `canon`, `search`, `mail`, `finance`, `tasks`, `calendar`, `status`, `check`. Writing, reversible and logged: `todo`, `task_done`, `mail_draft`. Talking back: `inbox_post`, `inbox_list`.
+Reading: `account`, `accounts`, `canon`, `search`, `mail`, `finance`, `tasks`, `calendar`, `live`, `status`, `check`. Writing, reversible and logged: `todo`, `task_done`, `mail_draft`. Talking back: `inbox_post`, `inbox_list`.
 
 ## Dashboard
 

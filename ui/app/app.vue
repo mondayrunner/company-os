@@ -32,6 +32,7 @@ const links = computed(() => [
   { p: "/", t: "Overview" },
   { p: "/inbox", t: "Inbox", badge: () => live.inboxOpen.value },
   ...cfg.value.nav,
+  { p: "/activity", t: "Activity" },
   { p: "/status", t: "Status", badge: () => live.jobsBad.value },
 ])
 </script>
@@ -75,7 +76,7 @@ const links = computed(() => [
       <span
         class="size-1.5 rounded-full shrink-0 transition-colors"
         :class="live.fresh.value ? 'bg-red animate-ping' : 'bg-success/60'"
-        :title="`laatst gekeken ${new Date(live.beat.value || Date.now()).toLocaleTimeString()}`"
+        :title="`last checked ${new Date(live.beat.value || Date.now()).toLocaleTimeString()}`"
       />
       <p class="text-[13px] text-ink-3 tabular shrink-0">{{ clock }}</p>
     </header>

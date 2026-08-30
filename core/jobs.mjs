@@ -133,7 +133,6 @@ export function detectTarget() {
   return "cron";
 }
 
-/** Generate the files for a target into <root>/.company-os/jobs/<target>/ and install them. */
 /** launchd: PID of a running job, or null. */
 async function launchdPid(uid, label) {
   const r = await exec("launchctl", ["list", label]).catch(() => null);
@@ -141,6 +140,7 @@ async function launchdPid(uid, label) {
   return m ? Number(m[1]) : null;
 }
 
+/** Generate the files for a target into <root>/.company-os/jobs/<target>/ and install them. */
 export async function install(ctx, { target = detectTarget(), only = null, dryRun = false, force = false } = {}) {
   const jobs = jobsOf(ctx).filter((j) => !only || j.name === only);
   const s = schedulerOf(ctx);

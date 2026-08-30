@@ -1,14 +1,15 @@
 /**
  * Knowledge articles need a status, a last_verified date within the SLA, and
- * sources that still exist. Configure: checks.knowledge = { dir, slaDays }.
+ * sources that still exist. Configure: checks["knowledge-frontmatter"] (or the
+ * older key checks.knowledge, which also names the dir) = { slaDays }.
  */
 import { frontmatter } from "../core/markdown.mjs";
 
 export default {
   name: "knowledge-frontmatter",
   description: "status, last_verified within SLA, existing sources",
-  async run(ctx, h) {
-    const cfg = ctx.config.checks.knowledge ?? {};
+  async run(ctx, h, options = {}) {
+    const cfg = Object.keys(options).length ? options : ctx.config.checks.knowledge ?? {};
     const dir = h.knowledgeDir();
     if (!dir || !(await h.isDir(dir))) return [];
     const sla = cfg.slaDays ?? 60;

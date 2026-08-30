@@ -3,8 +3,8 @@
  * uid — and one reversible write: a draft. Works with any IMAP server; with
  * Proton Mail Bridge it is 127.0.0.1:1143 without TLS verification (local,
  * self-signed). Minimal client on node:net/node:tls, no dependency: LOGIN,
- * EXAMINE, SEARCH, FETCH, APPEND. Never marks anything as read, never moves or
- * sends. A draft lands in the Drafts folder and stays there until a human
+ * EXAMINE, SEARCH, FETCH, APPEND, and SELECT + STORE/EXPUNGE only to replace
+ * an earlier draft. Never marks anything as read, never sends. A draft lands in the Drafts folder and stays there until a human
  * sends it from the mail client.
  *
  *   "imap": { "envFile": "~/.config/sitelane-mail/.env", "host": "127.0.0.1", "port": 1143,

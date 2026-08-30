@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS inbox (
 -- What is running right now. Deliberately not in the markdown: an item's status
 -- is a fact about the item, but "someone is working on this" is a fact about
 -- this machine at this moment. It must not survive a restart — a run that did
--- not survive one was not still running — and it must not survive an index run.
+-- not survive one was not still running — so rows whose pid is gone are swept.
 CREATE TABLE IF NOT EXISTS running (
   item TEXT PRIMARY KEY, started TEXT NOT NULL, pid INTEGER, what TEXT
 );

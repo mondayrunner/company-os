@@ -3,16 +3,17 @@
  *
  * Every item is a markdown file in <root>/<config.inbox.dir> (git-visible,
  * works without any tool); SQLite indexes them for the dashboard and MCP.
- * A reply is the trigger: `company-os inbox run` executes approved items and
- * writes the result back into the same file. This is the only place the brain
+ * Approval is the trigger: the dashboard runs an approved item at once; from
+ * the CLI or MCP, `company-os inbox run` executes what is approved. Either way
+ * the result is written back into the same file. This is the only place the brain
  * writes markdown, and only after a human said yes to that specific item.
  * Outward actions (send, publish, invoice) are refused: those stay proposals
  * a human executes.
  *
  *   ---
  *   id: 2026-08-31-check-a1b2c3d4
- *   kind: drift | proposal | link | question | report
- *   from: check | compact | link | advisors | <agent>
+ *   kind: drift | proposal | question | report
+ *   from: check | compact | link | agent | cli | <role>
  *   where: sales-reviews/_pipeline/pipeline.md:3        # optional: what it is about
  *   created: 2026-08-31T08:00:00Z
  *   status: open | approved | rejected | done | failed
@@ -33,8 +34,8 @@ import { languageName } from "./config.mjs";
  *
  * Two lines of defence, and this is the softer one. The hard one is that the
  * executor has no way to reach outside: the four action types only edit files
- * under the root, and the agent runs with Read/Edit/Write/Grep/Glob — no shell,
- * no network. This word list catches the case where the *instruction* asks for
+ * under the root (`inside()` refuses any other path), and the agent runs with
+ * Read/Edit/Write/Grep/Glob — no shell, no network. This word list catches the case where the *instruction* asks for
  * something the human should do themselves, and it says so instead of quietly
  * doing half of it. Words come from the config so another language can add
  * its own ("verstuur", "factuur") without editing the engine.
@@ -125,6 +126,13 @@ export async function reply(ctx, id, text = "", { status = null } = {}) {
   return parseItem(out, file);
 }
 
+/** A path from an action, resolved against the root; anything outside it is refused. */
+function inside(ctx, rel) {
+  const file = resolve(ctx.path(String(rel ?? "")));
+  if (file !== ctx.root && !file.startsWith(ctx.root + sep)) throw new Error(`refused: ${rel} is outside the root`);
+  return file;
+}
+
 async function applyAction(ctx, item) {
   const a = item.action;
   const instruction = item.reply || a?.instruction || "";
@@ -145,7 +153,7 @@ async function applyAction(ctx, item) {
   }
   switch (a.type) {
     case "edit-markdown": {
-      const file = ctx.path(a.file);
+      const file = inside(ctx, a.file);
       let text = await readFile(file, "utf8");
       for (const r of a.replace ?? []) {
         if (!text.includes(r.from)) return { ok: false, message: `text to replace not found in ${a.file}: ${r.from.slice(0, 60)}` };
@@ -156,7 +164,7 @@ async function applyAction(ctx, item) {
       return { ok: true, message: `edited ${a.file}` };
     }
     case "set-frontmatter": {
-      const file = ctx.path(a.file);
+      const file = inside(ctx, a.file);
       const text = await readFile(file, "utf8");
       const fields = a.fields ?? { [a.field]: a.value ?? item.reply.split("\n").pop().replace(/^_[^_]*_\s*/, "").trim() };
       if (Object.values(fields).some((v) => !v)) return { ok: false, message: "no value: reply with the value to set" };
@@ -166,8 +174,9 @@ async function applyAction(ctx, item) {
       return { ok: true, message: `set ${Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join(", ")} in ${a.file}` };
     }
     case "move-file": {
-      await mkdir(dirname(ctx.path(a.to)), { recursive: true });
-      await rename(ctx.path(a.from), ctx.path(a.to));
+      const from = inside(ctx, a.from), to = inside(ctx, a.to);
+      await mkdir(dirname(to), { recursive: true });
+      await rename(from, to);
       return { ok: true, message: `moved ${a.from} → ${a.to}` };
     }
     case "agent": return agentAction(ctx, item, [a.instruction, item.reply].filter(Boolean).join("\n\nReply from the human:\n"));

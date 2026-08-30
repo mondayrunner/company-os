@@ -134,7 +134,7 @@ Last update: 2026-01-08
 
 ## Recurring
 
-Northwind pays €450 per month.
+Northwind pays €500 per month.
 `,
 });
 

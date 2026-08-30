@@ -9,7 +9,7 @@ Four extension points, one rule each. You add a file; nothing else changes.
 | A new health check | `checks/<name>.mjs` | `company-os check` and the inbox |
 | A new scheduled task | one entry in `jobs` | `company-os jobs list` and the status page |
 
-Public versions live in this repo. Your own live in your vault and win when the names clash, so you never fork.
+Public versions live in this repo. Your own live in your vault. Connectors: yours wins on a name clash. Checks: yours run next to the built-ins; turn one off with `"checks": { "<name>": false }`. Either way you never fork.
 
 | | Public | Yours |
 | --- | --- | --- |
@@ -58,7 +58,7 @@ export default {
 
 Rules that are not optional:
 
-- **No `write()`.** A connector reads. Anything that changes the outside world becomes an inbox item a human approves.
+- **Reads, plus `act()` for what the source can undo** (a card, a draft). Sending, paying and publishing never live in a connector: they become an inbox item a human carries out.
 - **`volatile: true` for anything live.** The value then stays in the source and is fetched when asked. Copy it into markdown and you have a second system that is wrong by tomorrow.
 - **Secrets from an env file.** The connector names the file, the vault never holds a key.
 - **Same `what` values as the connector you replace.** That is what makes them interchangeable. See `connectors/stripe.mjs` for the finance shape and `connectors/trello.mjs` for tasks.
@@ -129,8 +129,9 @@ export default {
   needs: ["finance"],                 // skipped when no live finance connector exists
   async run(ctx, h, options) {
     const r = await h.live("finance", { what: "open-invoices" });
+    const folders = Object.values(await h.accountFolders()).flat();
     return r.items
-      .filter((i) => !h.matchFolder(i.customer, Object.values(await h.accountFolders()).flat()))
+      .filter((i) => !h.matchFolder(i.customer, folders))
       .map((i) => ({ severity: "warn", where: `invoice ${i.number}`, what: `${i.customer} has no account folder` }));
   },
 };
@@ -150,6 +151,6 @@ Every finding becomes one inbox item, fingerprinted, so the same finding never l
 
 ## What not to build
 
-- **A connector that writes.** Propose it in the inbox instead.
+- **A connector that sends, pays or publishes.** Reversible writes go in `act()`; the rest is an inbox item.
 - **Two-way sync between markdown and a system.** Markdown is the canon for what you decide. The system is the canon for what it measures. Neither copies the other.
 - **A panel that fetches from a service directly.** Panels call `/api/...`. Server routes hold the keys, so no key reaches the browser.

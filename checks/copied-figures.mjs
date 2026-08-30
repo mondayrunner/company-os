@@ -1,16 +1,17 @@
 /**
  * Figures that live in a system of record (MRR, ARR) must not be copied into
  * markdown (where a current figure would live: pipeline, knowledge) outside log sections: a copy is a second system that starts ageing
- * immediately. Configure: checks.copiedFigures = { patterns, currency,
- * exclude: [path prefixes], excludeHeadings: ["Log"] }.
+ * immediately. Configure: checks["copied-figures"] (or the older key
+ * checks.copiedFigures) = { patterns, currency, kinds, exclude: [path prefixes],
+ * excludeHeadings: ["Log"] }.
  */
 import { sections } from "../core/markdown.mjs";
 
 export default {
   name: "copied-figures",
   description: "MRR/ARR amounts copied into markdown",
-  async run(ctx, h) {
-    const cfg = ctx.config.checks.copiedFigures ?? {};
+  async run(ctx, h, options = {}) {
+    const cfg = Object.keys(options).length ? options : ctx.config.checks.copiedFigures ?? {};
     const patterns = cfg.patterns ?? ["MRR", "ARR"];
     const currency = cfg.currency ?? "€";
     const exclude = cfg.exclude ?? [];

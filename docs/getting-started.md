@@ -45,11 +45,12 @@ which part, so an existing vault keeps its own vocabulary.
 ```bash
 company-os index
 company-os search "what we charge"
-company-os context accounts/customers/northwind
+company-os account northwind
 ```
 
-`search` is full text over your own words. `context` is everything around one
-account: its files, what links to it, what a job last said about it.
+`search` is full text over your own words. `account` is one account in one
+answer: the head of its status file, who holds the ball, its pipeline row,
+commitments, last contact and newest files.
 
 ## 4. Get an answer
 

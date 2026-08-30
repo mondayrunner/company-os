@@ -4,7 +4,7 @@ The dashboard: what your brain knows, what your live sources say right now, and 
 
 ```bash
 cd ui && npm install
-COMPANY_OS_ROOT=/path/to/your/vault npm run dev     # http://localhost:4321
+COMPANY_OS_ROOT=/path/to/your/vault npm run dev     # http://localhost:4320
 ```
 
 Or as a job: add `{ "name": "ui", "title": "Dashboard", "run": "cd ui && npx nuxt dev --port 4321", "service": true }` to `jobs` and run `company-os jobs install`.
@@ -15,11 +15,11 @@ There is no fixed set of panels. A panel is a file in `app/components/panels/`, 
 
 Adding a panel, a connector, a check or a job: [../docs/extending.md](../docs/extending.md).
 
-Pages: `/` overview, `/ask` ask the brain, `/inbox` answer and approve, `/status` modules and jobs.
+Pages: `/` overview, `/inbox` answer and approve, `/activity` what ran, `/status` connectors and jobs.
 
 ## Making it yours
 
-`ui.title`, `ui.logo`, `ui.nav` and `ui.examples` in the config cover the small stuff. For real changes, use it as a Nuxt layer:
+`ui.title`, `ui.logo`, `ui.nav` and `ui.panels` in the config cover the small stuff. For real changes, use it as a Nuxt layer:
 
 ```ts
 // my-dashboard/nuxt.config.ts

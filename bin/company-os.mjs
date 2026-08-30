@@ -4,11 +4,12 @@
  *
  * Reading
  *   index [--only a,b]        scan connectors into documents, chunks, relations, events
- *   search "<query>" [--raw]  full-text, canon first; --raw adds transcripts and plans
+ *   search "<query>" [--raw]  full-text, canon first; --raw adds transcripts, plans, advice
  *   account <name> [--full]   one account: status, ball, pipeline row, last contact
  *   accounts [--side x]       one line per open and won account
  *   canon [key] [--section]   a canonical file by short name
  *   mail | finance | tasks | calendar   live sources, answer-shaped
+ *   live <kind> [what]        any live source, raw
  *   status                    what is in the brain
  *
  * Writing, reversible and logged
@@ -19,13 +20,14 @@
  * Keeping it honest
  *   check [--no-live]         deterministic checks, report and inbox items
  *   link [--dry-run]          attach waiting transcripts to accounts
- *   inbox list|approve|reject|run   where agents talk back and you answer
+ *   inbox list|show|post|reply|approve|reject|run   where agents talk back and you answer
  *   snapshot | event <file>   daily metrics; record one job run
  *
  * Running it
  *   serve                     MCP server over stdio
- *   jobs list|install|run     the job list from the config on launchd, cron or systemd
+ *   jobs list|install|uninstall|run   the job list from the config on launchd, cron or systemd
  *   init [--example]          a folder you can run a command against
+ *   import-legacy             carry the events log over from an older database
  *
  * Global: --root <dir>, else COMPANY_OS_ROOT or the nearest config upward.
  * `company-os help` prints the same list with every flag.

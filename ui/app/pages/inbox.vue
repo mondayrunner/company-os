@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /**
- * The inbox: what the brain wants to change and you have not seen yet. Three
- * kinds — a proposal (approve applies it), a finding (approve acknowledges it,
- * reject silences it) and a report (read it, or type what to do and approve).
- * Approving runs the item at once; there is no waiting room between the two.
+ * The inbox: what the brain wants to change and you have not seen yet. Four
+ * kinds — a proposal (approve applies it), a finding (approve sends an agent to
+ * fix what it names, reject silences it), a question from `link` (answer, then
+ * approve) and a report (read it, or type what to do and approve). Approving
+ * from this page runs the item at once; an item approved from the CLI or MCP
+ * waits under "Approved" with a run button.
  * Built for triage, because findings arrive in batches: move with j/k, open
  * with e, approve with a, reject with r, select with x for bulk actions.
  */
@@ -27,7 +29,7 @@ const note = ref<string | null>(null)
 
 const sections = computed(() => [
   { key: "open", head: "Open", items: content.value?.open ?? [] },
-  { key: "approved", head: "Running", items: content.value?.approved ?? [] },
+  { key: "approved", head: "Approved", items: content.value?.approved ?? [] },
   { key: "closed", head: "Closed", items: content.value?.closed ?? [], dim: true },
 ])
 // One flat order for keyboard movement, in the order the sections are shown.
@@ -144,18 +146,17 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
                   <span class="text-[13px] text-ink block truncate">{{ i.title }}</span>
                   <span v-if="i.where" class="text-[11px] text-ink-3 font-mono block truncate">{{ i.where }}</span>
                 </span>
-                <!-- Status alleen tonen als hij iets toevoegt: in de open-sectie is hij voor elke rij hetzelfde. -->
+                <!-- Show the status only when it adds something: in the open section it is the same for every row. -->
                 <span v-if="i.status !== 'open'" class="text-[10px] shrink-0 uppercase tracking-wide mt-0.5" :class="statusTone[i.status] || 'text-ink-3'">{{ i.status }}</span>
                 <span class="text-[11px] text-ink-3 shrink-0 tabular mt-0.5">{{ fmt.date(i.created) }}</span>
               </button>
               <!-- The two decisions live on the row itself; opening the item is for reading, not for acting.
-                   A report has only one: you read it and close it. There is nothing to approve, because
-                   nothing is waiting to be carried out. -->
+                   A report is read and closed, unless you type what you want done: then approve runs that. -->
               <div v-if="i.status === 'open'" class="flex gap-1 shrink-0 -mt-0.5">
                 <button v-if="i.kind !== 'report' || (reply[i.id] ?? '').trim()" class="text-[11px] px-2 py-1 rounded-full text-success hover:bg-success-bg disabled:opacity-40" :disabled="working === i.id" :title="i.kind === 'report' ? 'do what you typed (a)' : 'approve (a)'" @click.stop="act('approve', i.id, reply[i.id])">✓</button>
                 <button class="text-[11px] px-2 py-1 rounded-full text-ink-3 hover:bg-header disabled:opacity-40" :disabled="working === i.id" :title="i.kind === 'report' ? 'close (r)' : 'reject (r)'" @click.stop="act('reject', i.id)">✕</button>
               </div>
-              <span v-else-if="i.status === 'approved' && isRunning(i.id)" class="text-[11px] px-2 py-1 rounded-full bg-header text-ink-3 shrink-0 tabular flex items-center gap-1.5" title="draait — dit gaat door als je wegklikt">
+              <span v-else-if="i.status === 'approved' && isRunning(i.id)" class="text-[11px] px-2 py-1 rounded-full bg-header text-ink-3 shrink-0 tabular flex items-center gap-1.5" title="running — this carries on if you navigate away">
                 <span class="size-1.5 rounded-full bg-success animate-pulse" />{{ elapsed(runningFor(i.id)) }}
               </span>
               <button v-else-if="i.status === 'approved'" class="text-[11px] px-2 py-1 rounded-full bg-ink text-card hover:opacity-80 disabled:opacity-40 shrink-0 min-w-[2.6rem]" :disabled="!!working" title="run (u)" @click.stop="act('run', i.id)">{{ working === i.id ? "…" : "run" }}</button>

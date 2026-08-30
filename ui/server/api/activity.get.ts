@@ -8,7 +8,7 @@ import { list as running } from "#core/running.mjs"
  * it stays short — an inbox that also carries "this finished" turns into a feed,
  * and the one item that needed you drowns in the twenty that did not. So a
  * finished run goes here and the artefact goes where artefacts go: a draft to
- * Proton, an edit to the file, a finding to the inbox.
+ * the mail client, an edit to the file, a finding to the inbox.
  *
  * Everything here comes from the `events` table, which jobs already write to.
  * `running` is bolted on top so "now" and "just then" read as one list.

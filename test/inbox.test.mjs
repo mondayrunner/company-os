@@ -36,7 +36,7 @@ test("checks post drift items with a fingerprint; pipeline-freshness carries an 
   const r = await runChecks(ctx, db, { live: false });
   assert.ok(r.inbox.posted >= 5);
   const items = await listItems(ctx, { status: "open" });
-  // De titel is nu de bevinding zelf; de plek staat in `where`.
+  // The title is the finding itself; the location is in `where`.
   const fresh = items.find((i) => i.action?.type === "edit-markdown");
   assert.match(fresh.title, /last update says/);
   assert.match(fresh.where, /pipeline\.md/);
@@ -68,6 +68,13 @@ test("outward actions are refused", async () => {
   const r = await runApproved(ctx, { only: id });
   assert.equal(r[0].ok, false); assert.match(r[0].message, /refused/);
   assert.equal((await listItems(ctx)).find((i) => i.id === id).status, "failed");
+});
+
+test("actions cannot reach outside the root", async () => {
+  const { id } = await postItem(ctx, { kind: "proposal", from: "agent", title: "Tidy a note", body: "…", action: { type: "edit-markdown", file: "../outside.md", replace: [] } });
+  await reply(ctx, id, "yes", { status: "approved" });
+  const r = await runApproved(ctx, { only: id });
+  assert.equal(r[0].ok, false); assert.match(r[0].message, /outside the root/);
 });
 
 test("rejected items silence the same finding", async () => {

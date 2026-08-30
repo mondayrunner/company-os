@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
 import { join } from "node:path"
 
-// Reply, approve, reject or run. `run` executes approved items through the CLI
+// Post, reply, approve, reject or run. `run` executes approved items through the CLI
 // (files under the root only; outward actions are refused by company-os itself).
 //
 // Running does not block the request. An agent run takes minutes, and a request

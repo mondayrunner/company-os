@@ -85,9 +85,8 @@ onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
       </div>
 
       <p class="text-[11px] text-ink-3 mt-4 leading-relaxed">
-        Every job writes a row here through its status file; runs you start yourself — an inbox item, a role on a card, a
-        draft — write one too. Cost is what the run reported, so a row without a number is one that does not talk to a
-        model. Things that need a decision from you are in the
+        Every job writes a row here through its status file; runs you start yourself — an inbox item, a draft — write
+        one too. Cost shows when the run reported one; jobs that write their own status usually do not. Things that need a decision from you are in the
         <NuxtLink to="/inbox" class="underline">inbox</NuxtLink>, not here.
       </p>
     </div>
