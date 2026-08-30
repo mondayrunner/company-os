@@ -22,8 +22,6 @@ useHead(() => ({ title: cfg.value.title || cfg.value.name || "company-os" }))
 
 const notify = useNotifications()
 const live = useLive()
-const refreshing = ref(false)
-async function refreshAll() { refreshing.value = true; try { await refreshNuxtData() } finally { refreshing.value = false } }
 
 // The nav is the config: pages the base ships, plus whatever a private layer
 // adds. Inbox sits second, because that is the one page that asks something of
@@ -65,13 +63,10 @@ const links = computed(() => [
         </NuxtLink>
       </nav>
       <p class="text-[13px] text-ink-3 first-letter:uppercase hidden 2xl:block whitespace-nowrap">{{ today }}</p>
-      <button class="ml-auto text-[11px] px-2.5 py-1 rounded-full ring-1 ring-line text-ink-3 hover:text-ink hover:ring-ink-3 transition-colors disabled:opacity-40 flex items-center gap-1.5" :disabled="refreshing" title="refresh every panel" @click="refreshAll()">
-        <span :class="refreshing ? 'inline-block animate-spin' : 'inline-block'">↻</span><span class="hidden lg:inline"> All</span>
-      </button>
-      <button v-if="!notify.allowed.value" class="text-[11px] px-2.5 py-1 rounded-full bg-red text-white hover:bg-red-hover transition-colors whitespace-nowrap shrink-0" title="the dashboard may then warn you when something breaks" @click="notify.ask()">
+      <button v-if="!notify.allowed.value" class="ml-auto text-[11px] px-2.5 py-1 rounded-full bg-red text-white hover:bg-red-hover transition-colors whitespace-nowrap shrink-0" title="the dashboard may then warn you when something breaks" @click="notify.ask()">
         <span class="hidden lg:inline">enable notifications</span><span class="lg:hidden">🔔</span>
       </button>
-      <button v-else class="text-[11px] px-2.5 py-1 rounded-full ring-1 ring-line transition-colors" :class="notify.on.value ? 'text-ink-2 hover:text-ink' : 'text-ink-3 hover:text-ink'" @click="notify.on.value = !notify.on.value">{{ notify.on.value ? "🔔" : "🔕" }}</button>
+      <button v-else class="ml-auto text-[11px] px-2.5 py-1 rounded-full ring-1 ring-line transition-colors" :class="notify.on.value ? 'text-ink-2 hover:text-ink' : 'text-ink-3 hover:text-ink'" @click="notify.on.value = !notify.on.value">{{ notify.on.value ? "🔔" : "🔕" }}</button>
       <button class="text-[11px] px-2.5 py-1 rounded-full ring-1 ring-line text-ink-3 hover:text-ink hover:ring-ink-3 transition-colors" :title="`Theme: ${theme}`" @click="cycle">{{ theme === "system" ? "auto" : theme }}</button>
       <span
         class="size-1.5 rounded-full shrink-0 transition-colors"
