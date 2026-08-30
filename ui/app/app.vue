@@ -25,13 +25,17 @@ const live = useLive()
 // The nav is the config: pages the base ships, plus whatever a private layer
 // adds. Inbox sits second, because that is the one page that asks something of
 // you — and it carries the count, so you see it from any other page.
-const links = computed(() => [
-  { p: "/", t: "Overview" },
-  { p: "/inbox", t: "Inbox", badge: () => live.inboxOpen.value },
-  ...cfg.value.nav,
-  { p: "/activity", t: "Activity" },
-  { p: "/status", t: "Status", badge: () => live.jobsBad.value },
-])
+const links = computed(() => {
+  const base = [
+    { p: "/", t: "Overview" },
+    { p: "/inbox", t: "Inbox", badge: () => live.inboxOpen.value },
+    { p: "/activity", t: "Activity" },
+    { p: "/status", t: "Status", badge: () => live.jobsBad.value },
+  ]
+  // A layer's nav entries slot in before Activity; one that names a base page is dropped, not doubled.
+  const own = cfg.value.nav.filter((l: any) => !base.some((b) => b.p === l.p))
+  return [base[0], base[1], ...own, base[2], base[3]]
+})
 </script>
 
 <template>
