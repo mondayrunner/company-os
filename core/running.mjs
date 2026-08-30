@@ -60,7 +60,7 @@ export function finish(ctx, item) {
 /**
  * Write a finished run into the event log. Jobs already do this through
  * `company-os event`; this is the same row for work that has no job behind it —
- * an inbox item you ran, a draft you asked for.
+ * an inbox item you ran, a role you pointed at a card, a draft you asked for.
  * Without it those runs happen and leave no trace anywhere you can look.
  */
 export function record(ctx, { job, result = "ok", done = 1, failed = 0, message = "", cost = null } = {}) {
