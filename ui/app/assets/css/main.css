@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/* Warm, quiet palette. One signal colour (red); orange and green only for
+   status. A private layer overrides fonts and colours in its own main.css. */
+@theme {
+  --color-red: #fe5c45;
+  --color-red-hover: #e44c35;
+  --color-orange: #fd9046;
+  --color-success: #2ecc71;
+  --color-info: #3498db;
+
+  --color-cream: var(--th-ground);
+  --color-card: var(--th-card);
+  --color-line: var(--th-line);
+  --color-line-soft: var(--th-line-soft);
+  --color-ink: var(--th-ink);
+  --color-ink-2: var(--th-ink-2);
+  --color-ink-3: var(--th-ink-3);
+  --color-header: var(--th-header);
+  --color-header-2: var(--th-header-2);
+  --color-red-soft: var(--th-red-soft);
+  --color-success-bg: var(--th-success-bg);
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-henry: ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+}
+
+:root {
+  color-scheme: light;
+  --th-ground: #f7f5f4; --th-card: #ffffff; --th-line: #e7e5e4; --th-line-soft: #f0eeed;
+  --th-ink: #1c1917; --th-ink-2: #44403c; --th-ink-3: #78716c;
+  --th-header: #f4f2f1; --th-header-2: #faf9f8; --th-red-soft: #fff1f0; --th-success-bg: #f0fdf4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --th-ground: #1c1917; --th-card: #242020; --th-line: #3a3431; --th-line-soft: #2c2726;
+    --th-ink: #faf9f8; --th-ink-2: #c4bdb8; --th-ink-3: #8c8480;
+    --th-header: #2e2928; --th-header-2: #322c2b; --th-red-soft: #3a1f1c; --th-success-bg: #14261a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --th-ground: #1c1917; --th-card: #242020; --th-line: #3a3431; --th-line-soft: #2c2726;
+  --th-ink: #faf9f8; --th-ink-2: #c4bdb8; --th-ink-3: #8c8480;
+  --th-header: #2e2928; --th-header-2: #322c2b; --th-red-soft: #3a1f1c; --th-success-bg: #14261a;
+}
+
+body { background: var(--color-cream); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+.tabular { font-variant-numeric: tabular-nums; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Rendered answers from the brain (ask page, ask bar). */
+.answer .source { font-family: var(--font-mono); font-size: 11px; color: var(--color-red); background: var(--color-red-soft); padding: 1px 5px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
+.answer h3 { font-size: 14px; font-weight: 600; margin: 14px 0 4px; }
+.answer h4 { font-size: 13px; font-weight: 600; margin: 10px 0 2px; }
+.answer p { font-size: 13.5px; line-height: 1.55; margin: 0 0 8px; }
+.answer ul { margin: 0 0 8px 18px; list-style: disc; font-size: 13.5px; line-height: 1.5; }
+.answer code { font-family: var(--font-mono); font-size: 12px; background: var(--color-line-soft); padding: 1px 4px; border-radius: 4px; }
+.answer table { font-size: 12.5px; border-collapse: collapse; margin: 0 0 8px; }
+.answer td, .answer th { padding: 2px 8px 2px 0; border-bottom: 1px solid var(--color-line-soft); text-align: left; }

@@ -1,0 +1,53 @@
+{
+  "name": "Acme Studio",
+  "language": "en",
+  "db": ".company-os/brain.db",
+  "stateDir": ".company-os/state",
+  "outputs": "outputs",
+  "ignore": ["node_modules", ".git", ".company-os", "outputs"],
+  "kinds": [
+    { "kind": "knowledge", "prefix": "knowledge/" },
+    { "kind": "account", "pattern": "^accounts/(leads|customers|partners)/[^/]+/" },
+    { "kind": "pipeline", "prefix": "pipeline/" },
+    { "kind": "contact", "prefix": "contacts/" },
+    { "kind": "transcript", "prefix": "transcripts/" },
+    { "kind": "strategy", "prefix": "compass.md" }
+  ],
+  "accounts": {
+    "root": "accounts",
+    "sides": ["leads", "customers", "partners"],
+    "openSides": ["leads"],
+    "wonSides": ["customers"],
+    "statusFile": "STATUS.md",
+    "ballLine": "**Ball with:**"
+  },
+  "pipeline": {
+    "file": "pipeline/pipeline.md",
+    "updateLine": "Last update",
+    "logHeading": "## Log",
+    "leads": { "heading": "## Active leads", "columns": ["since", "who", "stage", "action", "ball"], "who": "who", "ball": "ball", "action": "action" },
+    "commitments": { "heading": "## Open commitments", "columns": ["who", "type", "status", "action"], "who": "who" },
+    "ballSelf": ["me", "us", "we"]
+  },
+  "canon": {
+    "pricing": "knowledge/pricing.md",
+    "positioning": "knowledge/positioning.md",
+    "compass": "compass.md",
+    "company": "company.md"
+  },
+  "search": { "raw": ["transcript"] },
+  "checks": {
+    "knowledge": { "dir": "knowledge", "slaDays": 60 },
+    "docs": ["CLAUDE.md"],
+    "copiedFigures": { "patterns": ["MRR", "ARR"], "currency": "€", "excludeHeadings": ["Log"] }
+  },
+  "connectors": {
+    "markdown": {},
+    "status": {},
+    "tasks-markdown": { "file": "tasks.md" }
+  },
+  "jobs": [
+    { "name": "index", "title": "Index the vault", "run": "company-os index", "cron": "0 7 * * 1-5" },
+    { "name": "check", "title": "Weekly checks", "run": "company-os check", "cron": "0 8 * * 1" }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "companyos",
+  "version": "0.1.0",
+  "description": "A company brain in markdown and SQLite: index, search, checks, an inbox where agents talk back, and MCP. For people and agents. Zero dependencies.",
+  "type": "module",
+  "bin": {
+    "company-os": "bin/company-os.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT",
+  "repository": "github:mondayrunner/company-os"
+}
