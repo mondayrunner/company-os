@@ -51,7 +51,7 @@ company-os context accounts/customers/northwind
 `search` is full text over your own words. `context` is everything around one
 account: its files, what links to it, what a job last said about it.
 
-## 4. Ask it something
+## 4. Get an answer
 
 ```bash
 company-os accounts            # one line per open account: ball, next action, last touch

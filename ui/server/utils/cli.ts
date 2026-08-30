@@ -5,7 +5,7 @@ const exec = promisify(execFile)
 
 /**
  * Run the company-os CLI (same repo) for the commands that write or take long:
- * ask, inbox, jobs run. Output is JSON.
+ * inbox, jobs run. Output is JSON.
  */
 export async function cli(args: string[], timeoutMs = 300000) {
   const bin = join(ctx().lib, "bin", "company-os.mjs")

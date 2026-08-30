@@ -157,7 +157,7 @@ export async function install(ctx, { target = detectTarget(), only = null, dryRu
       await writeFile(file, renderLaunchd(ctx, j));
       if (dryRun) { done.push({ job: j.name, file }); continue; }
       const dest = join(agents, `${j.label}.plist`);
-      // Reloading a job kills it if it is running right now (a 10-minute agent run at 08:15, say). Skip unless forced.
+      // Reloading a job kills it if it is running right now (a ten-minute agent run, say). Skip unless forced.
       const pid = j.service ? null : await launchdPid(uid, j.label);
       if (pid && !force) { done.push({ job: j.name, label: j.label, ok: false, skipped: true, error: `running (pid ${pid}); install again later or use --force` }); continue; }
       await writeFile(dest, renderLaunchd(ctx, j));

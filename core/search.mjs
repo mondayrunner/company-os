@@ -5,7 +5,7 @@
  * owns the answer, because those notes repeat every name. So a word that lands
  * in the *path* or the *title* counts for much more than one in the body — a
  * folder called `.../harper-co-website/` is a stronger signal than ten
- * mentions of "Harper" in a morning report — and each kind of document carries a
+ * mentions of "Harper" in a daily plan — and each kind of document carries a
  * weight (a status file outranks a planner note). Both are config, not code.
  */
 const FALLBACK_STOPWORDS = "de het een en of in op te van voor met aan bij is zijn was wat wie waar hoe dat die deze dit er ik mij me we wij je jij jou ons onze niet ook nog al als naar over the a an of to is are was what who where how and or in on at for with my me we it its this that these those not also still all as into over from".split(" ");

@@ -53,12 +53,3 @@ body { background: var(--color-cream); color: var(--color-ink); font-family: var
 ::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* Rendered answers from the brain (ask page, ask bar). */
-.answer .source { font-family: var(--font-mono); font-size: 11px; color: var(--color-red); background: var(--color-red-soft); padding: 1px 5px; border-radius: 6px; text-decoration: none; white-space: nowrap; }
-.answer h3 { font-size: 14px; font-weight: 600; margin: 14px 0 4px; }
-.answer h4 { font-size: 13px; font-weight: 600; margin: 10px 0 2px; }
-.answer p { font-size: 13.5px; line-height: 1.55; margin: 0 0 8px; }
-.answer ul { margin: 0 0 8px 18px; list-style: disc; font-size: 13.5px; line-height: 1.5; }
-.answer code { font-family: var(--font-mono); font-size: 12px; background: var(--color-line-soft); padding: 1px 4px; border-radius: 4px; }
-.answer table { font-size: 12.5px; border-collapse: collapse; margin: 0 0 8px; }
-.answer td, .answer th { padding: 2px 8px 2px 0; border-bottom: 1px solid var(--color-line-soft); text-align: left; }

@@ -1,6 +1,6 @@
 /**
  * Run a command-line agent headlessly and return its JSON result. Used by
- * `ask` and `link`. The agent is whatever `config.agent.command` says
+ * `link --smart` and an approved inbox item. The agent is whatever `config.agent.command` says
  * (default: the `claude` CLI); the brain never needs an API key of its own.
  */
 import { execFile } from "node:child_process";

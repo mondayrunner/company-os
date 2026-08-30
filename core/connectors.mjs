@@ -53,7 +53,7 @@ export function byKind(connectors, kind) {
 /**
  * Read one live source. Null when no connector of that kind exists.
  *
- * This used to sit in five places (ask, checks, the CLI, MCP, the dashboard)
+ * This used to sit in four places (checks, the CLI, MCP, the dashboard)
  * with the same three steps five times. That pinned the call shape of `live()`
  * five times over: one addition to the connector contract and four places
  * behave differently from the fifth. The error message stays with the caller,
