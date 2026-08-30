@@ -1,7 +1,9 @@
-// Figures that live in a system of record (MRR, ARR) must not be copied into
-// markdown (where a current figure would live: pipeline, knowledge) outside log sections: a copy is a second system that starts ageing
-// immediately. Configure: checks.copiedFigures = { patterns, currency,
-// exclude: [path prefixes], excludeHeadings: ["Log"] }.
+/**
+ * Figures that live in a system of record (MRR, ARR) must not be copied into
+ * markdown (where a current figure would live: pipeline, knowledge) outside log sections: a copy is a second system that starts ageing
+ * immediately. Configure: checks.copiedFigures = { patterns, currency,
+ * exclude: [path prefixes], excludeHeadings: ["Log"] }.
+ */
 import { sections } from "../core/markdown.mjs";
 
 export default {

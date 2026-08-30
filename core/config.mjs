@@ -1,6 +1,8 @@
-// One place for configuration. The root is the folder that holds
-// company-os.config.json; everything else is relative to it. Markdown in the
-// root is the canon; the database and the state folder are derived.
+/**
+ * One place for configuration. The root is the folder that holds
+ * company-os.config.json; everything else is relative to it. Markdown in the
+ * root is the canon; the database and the state folder are derived.
+ */
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";

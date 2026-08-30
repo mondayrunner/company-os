@@ -1,6 +1,8 @@
-// Markdown the way a knowledge base writes it: YAML-ish frontmatter, a title,
-// sections per heading, and the occasional table. No YAML library: the subset
-// people actually write (scalars, inline lists, dash lists) is enough.
+/**
+ * Markdown the way a knowledge base writes it: YAML-ish frontmatter, a title,
+ * sections per heading, and the occasional table. No YAML library: the subset
+ * people actually write (scalars, inline lists, dash lists) is enough.
+ */
 import { createHash } from "node:crypto";
 
 export function frontmatter(text) {

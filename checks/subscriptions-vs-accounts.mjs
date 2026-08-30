@@ -1,7 +1,9 @@
-// Every active subscription in the finance system has an account folder, and
-// the folder's status file mentions the monthly amount. Needs a connector of
-// kind "finance" with live({ what: "subscriptions" }) → { items: [{ id,
-// customer, monthly, currency }] }. Skips when there is none.
+/**
+ * Every active subscription in the finance system has an account folder, and
+ * the folder's status file mentions the monthly amount. Needs a connector of
+ * kind "finance" with live({ what: "subscriptions" }) → { items: [{ id,
+ * customer, monthly, currency }] }. Skips when there is none.
+ */
 export default {
   name: "subscriptions-vs-accounts",
   description: "active subscriptions ↔ account folders",

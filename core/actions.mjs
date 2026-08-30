@@ -1,12 +1,14 @@
-// Reversible writes, with a trace.
-//
-// The rule from CLAUDE.md, in code: making is free as long as it lands
-// somewhere you can undo it; the irreversible step stays with a human. A todo
-// is a card you can archive, a draft is a file in Drafts, a moved card can be
-// moved back. So these run without asking — and every one of them writes a
-// row to the events table, which is what the activity log and the dashboard
-// read. Nothing in this file sends, pays or publishes; there is no function
-// for that on purpose.
+/**
+ * Reversible writes, with a trace.
+ *
+ * The rule from CLAUDE.md, in code: making is free as long as it lands
+ * somewhere you can undo it; the irreversible step stays with a human. A todo
+ * is a card you can archive, a draft is a file in Drafts, a moved card can be
+ * moved back. So these run without asking — and every one of them writes a
+ * row to the events table, which is what the activity log and the dashboard
+ * read. Nothing in this file sends, pays or publishes; there is no function
+ * for that on purpose.
+ */
 import { doAct } from "./connectors.mjs";
 import { record } from "./running.mjs";
 

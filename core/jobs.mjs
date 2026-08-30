@@ -1,17 +1,19 @@
-// Jobs: one list in the config, installed on whatever the machine has —
-// launchd (macOS), cron, or systemd user timers. Every job honours the same
-// status contract: a status file per run (written by the job itself, or by
-// `company-os jobs run` as a fallback when the job wrote none) and a log that
-// rotates at 2 MB.
-//
-//   "scheduler": { "logs": "~/Library/Logs", "logPrefix": "company-os-", "labelPrefix": "com.company-os." },
-//   "jobs": [
-//     { "name": "index",  "title": "Index the vault", "run": "company-os index", "cron": "45 7 * * 1-5" },
-//     { "name": "check",  "title": "Weekly checks",   "run": "company-os check", "cron": "0 8 * * 1", "label": "nl.example.check" },
-//     { "name": "ui",     "title": "Dashboard",       "run": "company-os ui",    "service": true }
-//   ]
-//
-// `cron` is standard five-field cron. `service: true` = keep running (KeepAlive / @reboot / Restart=always).
+/**
+ * Jobs: one list in the config, installed on whatever the machine has —
+ * launchd (macOS), cron, or systemd user timers. Every job honours the same
+ * status contract: a status file per run (written by the job itself, or by
+ * `company-os jobs run` as a fallback when the job wrote none) and a log that
+ * rotates at 2 MB.
+ *
+ *   "scheduler": { "logs": "~/Library/Logs", "logPrefix": "company-os-", "labelPrefix": "com.company-os." },
+ *   "jobs": [
+ *     { "name": "index",  "title": "Index the vault", "run": "company-os index", "cron": "45 7 * * 1-5" },
+ *     { "name": "check",  "title": "Weekly checks",   "run": "company-os check", "cron": "0 8 * * 1", "label": "nl.example.check" },
+ *     { "name": "ui",     "title": "Dashboard",       "run": "company-os ui",    "service": true }
+ *   ]
+ *
+ * `cron` is standard five-field cron. `service: true` = keep running (KeepAlive / @reboot / Restart=always).
+ */
 import { mkdir, readFile, writeFile, stat, rename, readdir } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { existsSync } from "node:fs";

@@ -1,5 +1,7 @@
-// Paths in backticks inside the rule documents (CLAUDE.md, READMEs) must
-// exist. Configure: checks.docs = ["CLAUDE.md", "knowledge/CLAUDE.md", "../CLAUDE.md"].
+/**
+ * Paths in backticks inside the rule documents (CLAUDE.md, READMEs) must
+ * exist. Configure: checks.docs = ["CLAUDE.md", "knowledge/CLAUDE.md", "../CLAUDE.md"].
+ */
 import { dirname, join } from "node:path";
 import { stat, readdir } from "node:fs/promises";
 

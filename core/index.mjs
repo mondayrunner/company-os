@@ -1,9 +1,11 @@
-// `company-os index`: run the connectors that read files and logs (not the
-// volatile, live ones), write documents, chunks, relations and events. Only
-// changed files are rewritten. Connectors that produce files (transcripts) run
-// before `markdown` so the scan picks them up. `company-os snapshot` runs the
-// volatile connectors (finance, tasks, calendar, mail, dashboard metrics) once
-// a day for history; nothing from them is ever copied into markdown.
+/**
+ * `company-os index`: run the connectors that read files and logs (not the
+ * volatile, live ones), write documents, chunks, relations and events. Only
+ * changed files are rewritten. Connectors that produce files (transcripts) run
+ * before `markdown` so the scan picks them up. `company-os snapshot` runs the
+ * volatile connectors (finance, tasks, calendar, mail, dashboard metrics) once
+ * a day for history; nothing from them is ever copied into markdown.
+ */
 import { now, registerSource } from "./db.mjs";
 import { loadConnectors } from "./connectors.mjs";
 import { indexInbox } from "./inbox.mjs";

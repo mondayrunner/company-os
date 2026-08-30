@@ -1,12 +1,14 @@
-// `company-os check`: deterministic checks over the markdown and, when a live
-// source is configured, against reality. No AI: these are the controls you
-// want debuggable and free. Findings carry a severity, a place and a line;
-// a finding on a line a human already marked (config.markers) is dropped.
-//
-// A check is a module:  export default { name, description, needs?: ["finance"], run(ctx, h, options) -> findings[] }
-// `options` is `config.checks.<name>` — its own settings, handed to it instead
-// of every check reaching into the whole config for its own corner of it.
-// Built-ins live in ../checks; private ones in <root>/checks/*.mjs.
+/**
+ * `company-os check`: deterministic checks over the markdown and, when a live
+ * source is configured, against reality. No AI: these are the controls you
+ * want debuggable and free. Findings carry a severity, a place and a line;
+ * a finding on a line a human already marked (config.markers) is dropped.
+ *
+ * A check is a module:  export default { name, description, needs?: ["finance"], run(ctx, h, options) -> findings[] }
+ * `options` is `config.checks.<name>` — its own settings, handed to it instead
+ * of every check reaching into the whole config for its own corner of it.
+ * Built-ins live in ../checks; private ones in <root>/checks/*.mjs.
+ */
 import { readdir, readFile, stat, mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";

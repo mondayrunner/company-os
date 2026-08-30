@@ -1,21 +1,23 @@
-// `company-os link`: attach transcripts waiting in the inbox folder to an
-// account without a human, where that is safe. Deliberately conservative:
-//   1. Two or more distinct names from one account in the text, and that score
-//      is at least twice the runner-up → set `account:` plus a marker.
-//   1b. One hit is enough when it is a strong name (a company name from an
-//      account folder or a system of record, 5+ chars): "globex" is
-//      unambiguous, "david" is not.
-//   2. No account name at all and it is a dictation into an editor/terminal →
-//      `account: internal` (own thinking, no customer).
-//   3. Everything in between stays open, with a proposal for the human.
-// Reversible: the marker `linked_by: company-os link` sits in the frontmatter;
-// a human simply overwrites the line.
-//
-// `--smart` adds one headless agent run over what is still open; only "high"
-// confidence is applied, "medium" becomes a proposal.
-//
-// The name index comes from `config.link.namesModule`, a module exporting
-// `names()` → Map<key, { name, accounts: Set<string>, sources: Set<string> }>.
+/**
+ * `company-os link`: attach transcripts waiting in the inbox folder to an
+ * account without a human, where that is safe. Deliberately conservative:
+ *   1. Two or more distinct names from one account in the text, and that score
+ *      is at least twice the runner-up → set `account:` plus a marker.
+ *   1b. One hit is enough when it is a strong name (a company name from an
+ *      account folder or a system of record, 5+ chars): "globex" is
+ *      unambiguous, "david" is not.
+ *   2. No account name at all and it is a dictation into an editor/terminal →
+ *      `account: internal` (own thinking, no customer).
+ *   3. Everything in between stays open, with a proposal for the human.
+ * Reversible: the marker `linked_by: company-os link` sits in the frontmatter;
+ * a human simply overwrites the line.
+ *
+ * `--smart` adds one headless agent run over what is still open; only "high"
+ * confidence is applied, "medium" becomes a proposal.
+ *
+ * The name index comes from `config.link.namesModule`, a module exporting
+ * `names()` → Map<key, { name, accounts: Set<string>, sources: Set<string> }>.
+ */
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

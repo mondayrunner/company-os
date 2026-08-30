@@ -1,5 +1,7 @@
-// Secrets live in env files outside the vault (~/.config/<tool>/.env), never
-// in the repo. A connector names the file in its options and asks for keys.
+/**
+ * Secrets live in env files outside the vault (~/.config/<tool>/.env), never
+ * in the repo. A connector names the file in its options and asks for keys.
+ */
 import { readFile } from "node:fs/promises";
 import { expandHome } from "./config.mjs";
 

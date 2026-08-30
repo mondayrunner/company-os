@@ -1,26 +1,35 @@
 #!/usr/bin/env node
-// company-os: a company brain in markdown and SQLite.
-//
-//   company-os index [--only a,b]     scan connectors → documents, chunks, relations, events
-//   company-os snapshot               daily metrics from the live (metric) connectors
-//   company-os event <status.json>    record one job run (called by job wrappers)
-//   company-os search "<query>"       full-text search, top 8 (N=20 for more)
-//   company-os account <name|path> [--full]   what is going on with one account
-//   company-os accounts [--side x]    one line per open and won account
-//   company-os canon [key] [--section s]   a canonical file by short name
-//   company-os link [--dry-run] [--smart]   attach waiting transcripts to accounts
-//   company-os check [--no-live] [--only a,b] [--json]   deterministic checks, report + status
-//   company-os live <kind> [what]     read one live source now (tasks, finance, calendar, mail)
-//   company-os mail [query] [--uid n] finance | tasks | calendar [--from d --to d]   live sources, answer-shaped
-//   company-os todo "title" [--body ..] [--due d] [--list l] | task-done <id> | draft --to .. --title .. --file body.txt
-//   company-os inbox list|post|reply|approve|reject|run   the one place agents talk back and you answer
-//   company-os serve                  MCP server over stdio: account, accounts, canon, search, mail, finance, tasks, calendar, todo, task_done, mail_draft, check, inbox, status
-//   company-os jobs list|install|uninstall|run   the job list from the config on launchd, cron or systemd
-//   company-os status                 what is in the brain, which sources were scanned
-//   company-os import-legacy <db>     copy events/metrics from a pre-company-os db
-//   company-os init [--name ..] [--language xx] [--example]   a vault you can run a command against
-//
-// Global: --root <dir> (else COMPANY_OS_ROOT / COMPANY_OS / nearest config upward).
+/**
+ * company-os: a company brain in markdown and SQLite.
+ *
+ * Reading
+ *   index [--only a,b]        scan connectors into documents, chunks, relations, events
+ *   search "<query>" [--raw]  full-text, canon first; --raw adds transcripts and plans
+ *   account <name> [--full]   one account: status, ball, pipeline row, last contact
+ *   accounts [--side x]       one line per open and won account
+ *   canon [key] [--section]   a canonical file by short name
+ *   mail | finance | tasks | calendar   live sources, answer-shaped
+ *   status                    what is in the brain
+ *
+ * Writing, reversible and logged
+ *   todo "title" [--due d]    a card on the task board
+ *   task-done <id>            move a card to done
+ *   draft --to --title --file a draft in the mail client, never sent
+ *
+ * Keeping it honest
+ *   check [--no-live]         deterministic checks, report and inbox items
+ *   link [--dry-run]          attach waiting transcripts to accounts
+ *   inbox list|approve|reject|run   where agents talk back and you answer
+ *   snapshot | event <file>   daily metrics; record one job run
+ *
+ * Running it
+ *   serve                     MCP server over stdio
+ *   jobs list|install|run     the job list from the config on launchd, cron or systemd
+ *   init [--example]          a folder you can run a command against
+ *
+ * Global: --root <dir>, else COMPANY_OS_ROOT or the nearest config upward.
+ * `company-os help` prints the same list with every flag.
+ */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadContext } from "../core/config.mjs";

@@ -1,7 +1,9 @@
-// Built-in: the status files every job writes (<stateDir>/<job>-status.json).
-// Each new run becomes a row in `events`; that is the history the status
-// files themselves do not keep, since they overwrite themselves.
-// Accepts both the English keys and the legacy Dutch ones.
+/**
+ * Built-in: the status files every job writes (<stateDir>/<job>-status.json).
+ * Each new run becomes a row in `events`; that is the history the status
+ * files themselves do not keep, since they overwrite themselves.
+ * Accepts both the English keys and the legacy Dutch ones.
+ */
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 

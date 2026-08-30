@@ -1,11 +1,13 @@
-// Stripe: subscriptions and invoices, read live. Never copied into markdown;
-// `scan()` only snapshots a few numbers per day for history.
-//
-//   "stripe": { "envFile": "~/.config/finance/.env", "keyName": "STRIPE_RESTRICTED_KEY" }
-//
-// live({ what: "subscriptions" })  → { items: [{ id, customer, email, monthly, currency, status, since, interval }] }
-// live({ what: "open-invoices" })  → { items: [{ id, number, customer, amount, currency, due, overdue }] }
-// live({ what: "revenue", days }) → { items: [{ month, net }] }  — paid invoices per month, net of VAT
+/**
+ * Stripe: subscriptions and invoices, read live. Never copied into markdown;
+ * `scan()` only snapshots a few numbers per day for history.
+ *
+ *   "stripe": { "envFile": "~/.config/finance/.env", "keyName": "STRIPE_RESTRICTED_KEY" }
+ *
+ * live({ what: "subscriptions" })  → { items: [{ id, customer, email, monthly, currency, status, since, interval }] }
+ * live({ what: "open-invoices" })  → { items: [{ id, number, customer, amount, currency, due, overdue }] }
+ * live({ what: "revenue", days }) → { items: [{ month, net }] }  — paid invoices per month, net of VAT
+ */
 import { secret, fetchRetry } from "../core/env.mjs";
 
 /** Monthly amount of a subscription in major units, across intervals. */

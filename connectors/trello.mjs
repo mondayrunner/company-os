@@ -1,13 +1,15 @@
-// Trello: one board of tasks, read live, plus two reversible writes: a new card
-// and a move to another list. Swappable with `tasks-markdown`: both answer
-// live({ what: "cards" }) with the same item shape.
-//
-//   "trello": { "envFile": "~/.config/daily-planner/.env", "board": "67fc…",
-//               "doneLists": ["Done", "Klaar"], "todoList": "Later" }
-//
-// live({ what: "cards" })                         → { items: [{ id, title, list, due, overdue, url, updated, labels }], lists }
-// act("create", { title, body, due, list })       → the new card, same shape
-// act("move", { id, list })                       → the moved card; list defaults to the first done list
+/**
+ * Trello: one board of tasks, read live, plus two reversible writes: a new card
+ * and a move to another list. Swappable with `tasks-markdown`: both answer
+ * live({ what: "cards" }) with the same item shape.
+ *
+ *   "trello": { "envFile": "~/.config/daily-planner/.env", "board": "67fc…",
+ *               "doneLists": ["Done", "Klaar"], "todoList": "Later" }
+ *
+ * live({ what: "cards" })                         → { items: [{ id, title, list, due, overdue, url, updated, labels }], lists }
+ * act("create", { title, body, due, list })       → the new card, same shape
+ * act("move", { id, list })                       → the moved card; list defaults to the first done list
+ */
 import { secret, fetchRetry } from "../core/env.mjs";
 
 export function normalizeCard(c, listName, now = Date.now()) {

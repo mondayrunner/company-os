@@ -1,7 +1,9 @@
-// Built-in: every markdown file under the root becomes a document with chunks
-// and the relations the text itself declares (frontmatter account, inline
-// account line on contact pages, knowledge sources, files inside an account
-// folder). Human decisions stay in the markdown; this only reads them.
+/**
+ * Built-in: every markdown file under the root becomes a document with chunks
+ * and the relations the text itself declares (frontmatter account, inline
+ * account line on contact pages, knowledge sources, files inside an account
+ * folder). Human decisions stay in the markdown; this only reads them.
+ */
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { frontmatter, titleOf, chunks, hashOf } from "../core/markdown.mjs";

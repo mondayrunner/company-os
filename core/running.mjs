@@ -1,15 +1,17 @@
-// What is running right now.
-//
-// An item's status lives in its markdown, because that is a fact about the item
-// and git should keep it. "Someone is working on this" is not that: it is a
-// fact about this machine at this moment, it is meaningless after a restart,
-// and it must not survive `company-os index`. So it lives in the database,
-// which is allowed to be thrown away.
-//
-// Without it the dashboard cannot tell the difference between a run that is
-// still going and one that never started: the item sits at `approved` either
-// way. Press run, navigate away, come back — the work continued (the child
-// process is not tied to the request), but the screen had no way of saying so.
+/**
+ * What is running right now.
+ *
+ * An item's status lives in its markdown, because that is a fact about the item
+ * and git should keep it. "Someone is working on this" is not that: it is a
+ * fact about this machine at this moment, it is meaningless after a restart,
+ * and it must not survive `company-os index`. So it lives in the database,
+ * which is allowed to be thrown away.
+ *
+ * Without it the dashboard cannot tell the difference between a run that is
+ * still going and one that never started: the item sits at `approved` either
+ * way. Press run, navigate away, come back — the work continued (the child
+ * process is not tied to the request), but the screen had no way of saying so.
+ */
 import { openDb } from "./db.mjs";
 
 /** Is this process still alive? Signal 0 asks without sending anything. */

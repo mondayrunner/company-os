@@ -1,25 +1,27 @@
-// The inbox: the one place agents talk back and the human answers.
-//
-// Every item is a markdown file in <root>/<config.inbox.dir> (git-visible,
-// works without any tool); SQLite indexes them for the dashboard and MCP.
-// A reply is the trigger: `company-os inbox run` executes approved items and
-// writes the result back into the same file. This is the only place the brain
-// writes markdown, and only after a human said yes to that specific item.
-// Outward actions (send, publish, invoice) are refused: those stay proposals
-// a human executes.
-//
-//   ---
-//   id: 2026-08-31-check-a1b2c3d4
-//   kind: drift | proposal | link | question | report
-//   from: check | compact | link | advisors | <agent>
-//   where: sales-reviews/_pipeline/pipeline.md:3        # optional: what it is about
-//   created: 2026-08-31T08:00:00Z
-//   status: open | approved | rejected | done | failed
-//   title: …
-//   fingerprint: a1b2c3d4            # same finding twice → one item
-//   action: {"type":"edit-markdown","file":"…","replace":[{"from":"…","to":"…"}]}
-//   ---
-//   body … / ## Reply … / ## Result …
+/**
+ * The inbox: the one place agents talk back and the human answers.
+ *
+ * Every item is a markdown file in <root>/<config.inbox.dir> (git-visible,
+ * works without any tool); SQLite indexes them for the dashboard and MCP.
+ * A reply is the trigger: `company-os inbox run` executes approved items and
+ * writes the result back into the same file. This is the only place the brain
+ * writes markdown, and only after a human said yes to that specific item.
+ * Outward actions (send, publish, invoice) are refused: those stay proposals
+ * a human executes.
+ *
+ *   ---
+ *   id: 2026-08-31-check-a1b2c3d4
+ *   kind: drift | proposal | link | question | report
+ *   from: check | compact | link | advisors | <agent>
+ *   where: sales-reviews/_pipeline/pipeline.md:3        # optional: what it is about
+ *   created: 2026-08-31T08:00:00Z
+ *   status: open | approved | rejected | done | failed
+ *   title: …
+ *   fingerprint: a1b2c3d4            # same finding twice → one item
+ *   action: {"type":"edit-markdown","file":"…","replace":[{"from":"…","to":"…"}]}
+ *   ---
+ *   body … / ## Reply … / ## Result …
+ */
 import { mkdir, readdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join, dirname, resolve, sep } from "node:path";
 import { frontmatter, setFrontmatter, hashOf } from "./markdown.mjs";

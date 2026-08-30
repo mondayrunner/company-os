@@ -1,13 +1,15 @@
-// `company-os serve`: the brain as an MCP server over stdio (newline-delimited
-// JSON-RPC 2.0). No dependency.
-//
-// Every tool answers from the markdown, the index or a live source; none of
-// them calls a model. The agent on the other end does the thinking, so a call
-// comes back in milliseconds and the answer is a few kilobytes, not a list of
-// paths. The writing tools (todo, task_done, mail_draft) only do what can be
-// undone from the source itself and leave a row in the activity log; sending,
-// paying and publishing are not tools and will not be — they go through the
-// inbox and a human.
+/**
+ * `company-os serve`: the brain as an MCP server over stdio (newline-delimited
+ * JSON-RPC 2.0). No dependency.
+ *
+ * Every tool answers from the markdown, the index or a live source; none of
+ * them calls a model. The agent on the other end does the thinking, so a call
+ * comes back in milliseconds and the answer is a few kilobytes, not a list of
+ * paths. The writing tools (todo, task_done, mail_draft) only do what can be
+ * undone from the source itself and leave a row in the activity log; sending,
+ * paying and publishing are not tools and will not be — they go through the
+ * inbox and a human.
+ */
 import { createInterface } from "node:readline";
 import { search, status } from "../core/search.mjs";
 import { account, accounts, canon } from "../core/brief.mjs";

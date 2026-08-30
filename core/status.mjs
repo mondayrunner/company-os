@@ -1,6 +1,8 @@
-// The status contract every job honours: one JSON file per job in the state
-// folder, overwritten on every run, plus the same run appended to `events`.
-// A job that crashes still leaves a file (the shell wrapper's EXIT trap).
+/**
+ * The status contract every job honours: one JSON file per job in the state
+ * folder, overwritten on every run, plus the same run appended to `events`.
+ * A job that crashes still leaves a file (the shell wrapper's EXIT trap).
+ */
 import { mkdir, writeFile, rename, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { openDb } from "./db.mjs";

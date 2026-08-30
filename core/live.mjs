@@ -1,10 +1,12 @@
-// Live sources, answer-shaped.
-//
-// `live(kind, query)` hands back whatever the connector returns. These wrap
-// that into the answer an agent actually wants: not eighteen subscription rows
-// but the MRR and the count with the rows underneath; not a mail listing but
-// the mail with its body. Still no model, still milliseconds plus the round
-// trip to the source. Numbers here are never written into markdown.
+/**
+ * Live sources, answer-shaped.
+ *
+ * `live(kind, query)` hands back whatever the connector returns. These wrap
+ * that into the answer an agent actually wants: not eighteen subscription rows
+ * but the MRR and the count with the rows underneath; not a mail listing but
+ * the mail with its body. Still no model, still milliseconds plus the round
+ * trip to the source. Numbers here are never written into markdown.
+ */
 import { readLive } from "./connectors.mjs";
 
 const round = (n) => Math.round(n * 100) / 100;

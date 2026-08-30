@@ -1,12 +1,14 @@
-// Tasks in a markdown file, for people without a task tool. Same item shape as
-// `trello`, so `tasks: "tasks-markdown"` and `tasks: "trello"` are interchangeable.
-//
-//   "tasks-markdown": { "file": "tasks.md" }
-//
-// Format, one task per line, anywhere in the file:
-//   - [ ] Send the proposal to Acme (due: 2026-09-01) @accounts/leads/2026-01-15-acme
-//   - [x] Done tasks are ignored
-// A `## Heading` above the task becomes its list.
+/**
+ * Tasks in a markdown file, for people without a task tool. Same item shape as
+ * `trello`, so `tasks: "tasks-markdown"` and `tasks: "trello"` are interchangeable.
+ *
+ *   "tasks-markdown": { "file": "tasks.md" }
+ *
+ * Format, one task per line, anywhere in the file:
+ *   - [ ] Send the proposal to Acme (due: 2026-09-01) @accounts/leads/2026-01-15-acme
+ *   - [x] Done tasks are ignored
+ * A `## Heading` above the task becomes its list.
+ */
 import { readFile } from "node:fs/promises";
 
 export function parseTasks(text, now = Date.now()) {

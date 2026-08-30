@@ -1,19 +1,21 @@
-// Mail over IMAP, read live: unread headers, a search with bodies, one mail by
-// uid — and one reversible write: a draft. Works with any IMAP server; with
-// Proton Mail Bridge it is 127.0.0.1:1143 without TLS verification (local,
-// self-signed). Minimal client on node:net/node:tls, no dependency: LOGIN,
-// EXAMINE, SEARCH, FETCH, APPEND. Never marks anything as read, never moves or
-// sends. A draft lands in the Drafts folder and stays there until a human
-// sends it from the mail client.
-//
-//   "imap": { "envFile": "~/.config/sitelane-mail/.env", "host": "127.0.0.1", "port": 1143,
-//             "secure": false, "userName": "BRIDGE_USER", "passName": "BRIDGE_PASS",
-//             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>" }
-//
-// live({ what: "unread", limit: 40 })           → { unread, items: [{ uid, subject, from, address, date }] }
-// live({ what: "search", query, limit: 5 })     → { items: [{ uid, subject, from, address, to, date, body, attachments }] }
-// live({ what: "read", uid })                   → { item }
-// act("draft", { to, subject, body })           → { mailbox, subject, to, replaced }
+/**
+ * Mail over IMAP, read live: unread headers, a search with bodies, one mail by
+ * uid — and one reversible write: a draft. Works with any IMAP server; with
+ * Proton Mail Bridge it is 127.0.0.1:1143 without TLS verification (local,
+ * self-signed). Minimal client on node:net/node:tls, no dependency: LOGIN,
+ * EXAMINE, SEARCH, FETCH, APPEND. Never marks anything as read, never moves or
+ * sends. A draft lands in the Drafts folder and stays there until a human
+ * sends it from the mail client.
+ *
+ *   "imap": { "envFile": "~/.config/sitelane-mail/.env", "host": "127.0.0.1", "port": 1143,
+ *             "secure": false, "userName": "BRIDGE_USER", "passName": "BRIDGE_PASS",
+ *             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>" }
+ *
+ * live({ what: "unread", limit: 40 })           → { unread, items: [{ uid, subject, from, address, date }] }
+ * live({ what: "search", query, limit: 5 })     → { items: [{ uid, subject, from, address, to, date, body, attachments }] }
+ * live({ what: "read", uid })                   → { item }
+ * act("draft", { to, subject, body })           → { mailbox, subject, to, replaced }
+ */
 import { connect as tcp } from "node:net";
 import { connect as tls } from "node:tls";
 import { secret } from "../core/env.mjs";

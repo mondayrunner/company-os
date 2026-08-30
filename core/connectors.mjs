@@ -1,21 +1,23 @@
-// Connectors are plugins with one interface:
-//
-//   export default {
-//     name: "trello",
-//     kind: "tasks",          // tasks | crm | finance | calendar | mail | transcripts | knowledge | files | events | metrics
-//     volatile: true,         // true: never copied into markdown; read live, snapshotted daily
-//     location: "...",        // shown in `company-os status`
-//     scan(ctx)  -> { documents?, events?, metrics?, count, added, message }
-//     live(query, ctx) -> { items }        // optional, inference-time retrieval
-//     act(action, params, ctx) -> result   // optional, one reversible write per action
-//   }
-//
-// act() is for what can be undone from the source itself: a card you can
-// archive, a draft you can delete. Sending, paying, publishing never live
-// here; those go through the inbox and a human. Every act is recorded in the
-// events table by core/actions.mjs, so it shows up in the activity log.
-// Resolution order: <root>/connectors/<name>.mjs, <root>/connectors/<name>/index.mjs,
-// then the built-in ones next to this file. Private plugins need no fork.
+/**
+ * Connectors are plugins with one interface:
+ *
+ *   export default {
+ *     name: "trello",
+ *     kind: "tasks",          // tasks | crm | finance | calendar | mail | transcripts | knowledge | files | events | metrics
+ *     volatile: true,         // true: never copied into markdown; read live, snapshotted daily
+ *     location: "...",        // shown in `company-os status`
+ *     scan(ctx)  -> { documents?, events?, metrics?, count, added, message }
+ *     live(query, ctx) -> { items }        // optional, inference-time retrieval
+ *     act(action, params, ctx) -> result   // optional, one reversible write per action
+ *   }
+ *
+ * act() is for what can be undone from the source itself: a card you can
+ * archive, a draft you can delete. Sending, paying, publishing never live
+ * here; those go through the inbox and a human. Every act is recorded in the
+ * events table by core/actions.mjs, so it shows up in the activity log.
+ * Resolution order: <root>/connectors/<name>.mjs, <root>/connectors/<name>/index.mjs,
+ * then the built-in ones next to this file. Private plugins need no fork.
+ */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

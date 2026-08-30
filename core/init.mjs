@@ -1,10 +1,12 @@
-// `company-os init`: a vault you can run a command against, not an empty room.
-//
-// The first version wrote a config and stopped. You then ran `index` on zero
-// files, `check` on nothing and `search` on an empty database, and had to guess
-// what the thing was for. So init writes the folders too, and `--example` fills
-// them with a small company that has a real problem in it: the first `check`
-// finds it. The demo is the explanation.
+/**
+ * `company-os init`: a vault you can run a command against, not an empty room.
+ *
+ * The first version wrote a config and stopped. You then ran `index` on zero
+ * files, `check` on nothing and `search` on an empty database, and had to guess
+ * what the thing was for. So init writes the folders too, and `--example` fills
+ * them with a small company that has a real problem in it: the first `check`
+ * finds it. The demo is the explanation.
+ */
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";

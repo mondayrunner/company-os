@@ -1,12 +1,14 @@
-// Any calendar that publishes an ICS feed (Proton "share with anyone", Google
-// secret address, Fastmail…). Read live; zero-dependency parser with the
-// recurrence rules people actually use (DAILY/WEEKLY/MONTHLY/YEARLY, INTERVAL,
-// BYDAY, UNTIL, EXDATE). Local time zone = the machine's.
-//
-//   "ics-calendar": { "envFile": "~/.config/daily-planner/.env", "urlName": "PROTON_ICS_URL" }   // or "url": "https://…"
-//
-// live({ what: "today" })                      → { items: [{ start, end, summary, allDay }] }
-// live({ what: "range", from, to })            → { days: { "YYYY-MM-DD": [items] } }
+/**
+ * Any calendar that publishes an ICS feed (Proton "share with anyone", Google
+ * secret address, Fastmail…). Read live; zero-dependency parser with the
+ * recurrence rules people actually use (DAILY/WEEKLY/MONTHLY/YEARLY, INTERVAL,
+ * BYDAY, UNTIL, EXDATE). Local time zone = the machine's.
+ *
+ *   "ics-calendar": { "envFile": "~/.config/daily-planner/.env", "urlName": "PROTON_ICS_URL" }   // or "url": "https://…"
+ *
+ * live({ what: "today" })                      → { items: [{ start, end, summary, allDay }] }
+ * live({ what: "range", from, to })            → { days: { "YYYY-MM-DD": [items] } }
+ */
 import { secret, fetchRetry } from "../core/env.mjs";
 
 const DAY = 86400000;

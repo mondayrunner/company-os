@@ -1,14 +1,16 @@
-// Answers, not pointers.
-//
-// `search` finds where something is mentioned. These functions say what is
-// going on: the status of one account in a few kilobytes, one line per open
-// account, or a canonical file by its short name. Nothing here calls a model —
-// every answer is read straight from the markdown and the index, so it comes
-// back in milliseconds and the agent that asked does the thinking.
-//
-// Sizes are capped on purpose. A status file can grow to twenty kilobytes over
-// a long deal; the first sections are what changed most recently, so those go
-// out by default and the headings of the rest say what else is there.
+/**
+ * Answers, not pointers.
+ *
+ * `search` finds where something is mentioned. These functions say what is
+ * going on: the status of one account in a few kilobytes, one line per open
+ * account, or a canonical file by its short name. Nothing here calls a model —
+ * every answer is read straight from the markdown and the index, so it comes
+ * back in milliseconds and the agent that asked does the thinking.
+ *
+ * Sizes are capped on purpose. A status file can grow to twenty kilobytes over
+ * a long deal; the first sections are what changed most recently, so those go
+ * out by default and the headings of the rest say what else is there.
+ */
 import { readFile } from "node:fs/promises";
 import { makeHelpers } from "./checks.mjs";
 import { clean, frontmatter, sections, tableUnder, titleOf } from "./markdown.mjs";

@@ -1,5 +1,7 @@
-// Knowledge articles need a status, a last_verified date within the SLA, and
-// sources that still exist. Configure: checks.knowledge = { dir, slaDays }.
+/**
+ * Knowledge articles need a status, a last_verified date within the SLA, and
+ * sources that still exist. Configure: checks.knowledge = { dir, slaDays }.
+ */
 import { frontmatter } from "../core/markdown.mjs";
 
 export default {

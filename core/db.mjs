@@ -1,5 +1,7 @@
-// The database is an index over the markdown plus a log of what the jobs did.
-// Never the source of truth: delete it and `company-os index` rebuilds it.
+/**
+ * The database is an index over the markdown plus a log of what the jobs did.
+ * Never the source of truth: delete it and `company-os index` rebuilds it.
+ */
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";

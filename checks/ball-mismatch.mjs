@@ -1,6 +1,8 @@
-// "Ball with" in the pipeline row must agree with the account's status file.
-// Configure: pipeline.leads.ball (column), pipeline.ballSelf (words that mean
-// "me"), accounts.statusFile, accounts.ballLine.
+/**
+ * "Ball with" in the pipeline row must agree with the account's status file.
+ * Configure: pipeline.leads.ball (column), pipeline.ballSelf (words that mean
+ * "me"), accounts.statusFile, accounts.ballLine.
+ */
 export default {
   name: "ball-mismatch",
   description: "who holds the ball: pipeline row vs status file",

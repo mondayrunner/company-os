@@ -1,6 +1,8 @@
-// Every row in the leads table has an account folder on an open side, and every
-// folder on an open side has a row. Configure: pipeline.leads = { heading,
-// columns, who }, accounts.openSides = ["acquisition"].
+/**
+ * Every row in the leads table has an account folder on an open side, and every
+ * folder on an open side has a row. Configure: pipeline.leads = { heading,
+ * columns, who }, accounts.openSides = ["acquisition"].
+ */
 export default {
   name: "pipeline-accounts",
   description: "leads table rows ↔ account folders",

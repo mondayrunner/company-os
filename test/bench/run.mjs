@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// Benchmarks for the MCP layer: how long a call takes and how much it returns.
-//
-//   node test/bench/run.mjs --root <vault> account=harper search="Harper proposal" accounts canon=pricing
-//
-// Targets: every call under 100 ms in-process, answers under a few kilobytes.
-// Run it before and after a change to search or brief; put the numbers in the
-// commit message. This is the loop: change, measure, keep or revert.
+/**
+ * Benchmarks for the MCP layer: how long a call takes and how much it returns.
+ *
+ *   node test/bench/run.mjs --root <vault> account=harper search="Harper proposal" accounts canon=pricing
+ *
+ * Targets: every call under 100 ms in-process, answers under a few kilobytes.
+ * Run it before and after a change to search or brief; put the numbers in the
+ * commit message. This is the loop: change, measure, keep or revert.
+ */
 import { loadContext } from "../../core/config.mjs";
 import { openDb } from "../../core/db.mjs";
 import { search } from "../../core/search.mjs";

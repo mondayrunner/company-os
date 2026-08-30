@@ -1,20 +1,22 @@
-// Built-in: one daily snapshot of numbers from an HTTP JSON API (usually your
-// own dashboard), so you can see them as a line later. Configure routes and a
-// tiny path expression per metric:
-//
-//   "metrics-http": {
-//     "url": "http://localhost:4321/api",
-//     "routes": { "finance": "finance", "clients": "clients" },
-//     "metrics": {
-//       "mrr": "finance.stripe.mrr",
-//       "tickets_open": "clients.clients[].tickets[]|count",
-//       "tickets_late": "clients.clients[].tickets[?late]|count"
-//     },
-//     "timeoutMs": 90000
-//   }
-//
-// Path grammar: dotted keys; `[]` flattens an array; `[?prop]` keeps items
-// whose prop is truthy; a trailing `|count` or `|sum` reduces.
+/**
+ * Built-in: one daily snapshot of numbers from an HTTP JSON API (usually your
+ * own dashboard), so you can see them as a line later. Configure routes and a
+ * tiny path expression per metric:
+ *
+ *   "metrics-http": {
+ *     "url": "http://localhost:4321/api",
+ *     "routes": { "finance": "finance", "clients": "clients" },
+ *     "metrics": {
+ *       "mrr": "finance.stripe.mrr",
+ *       "tickets_open": "clients.clients[].tickets[]|count",
+ *       "tickets_late": "clients.clients[].tickets[?late]|count"
+ *     },
+ *     "timeoutMs": 90000
+ *   }
+ *
+ * Path grammar: dotted keys; `[]` flattens an array; `[?prop]` keeps items
+ * whose prop is truthy; a trailing `|count` or `|sum` reduces.
+ */
 export function evaluate(expr, data) {
   const [pathPart, reducer] = expr.split("|").map((s) => s.trim());
   let cur = [data];

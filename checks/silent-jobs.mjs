@@ -1,23 +1,25 @@
-// Jobs that fail without anyone noticing.
-//
-// A scheduled job writes a status file and a log, and then nobody opens either.
-// The failure mode is not a crash — it is silence: a job that stopped running,
-// or one that says "ok" about work it did not do. Both look identical from the
-// outside, which is exactly why they last for weeks.
-//
-// What this catches:
-//   - a job that never wrote a status file at all
-//   - a job whose last run reported an error, which nobody read (except the
-//     check job itself, whose "partial" means it found something)
-//   - a job that reported ok while doing nothing (done: 0)
-//   - a job whose last run is older than its own schedule allows
-//
-// What it cannot catch: a step inside a job that skips itself while the job as
-// a whole still reports ok. That has to be fixed where the job counts its work
-// — a step that is skipped is not a step that succeeded.
-//
-// Configure with `checks.silent-jobs`:
-//   { "ignore": ["dashboard"], "graceDays": { "daily": 2, "weekdays": 4, "weekly": 8, "monthly": 32 } }
+/**
+ * Jobs that fail without anyone noticing.
+ *
+ * A scheduled job writes a status file and a log, and then nobody opens either.
+ * The failure mode is not a crash — it is silence: a job that stopped running,
+ * or one that says "ok" about work it did not do. Both look identical from the
+ * outside, which is exactly why they last for weeks.
+ *
+ * What this catches:
+ *   - a job that never wrote a status file at all
+ *   - a job whose last run reported an error, which nobody read (except the
+ *     check job itself, whose "partial" means it found something)
+ *   - a job that reported ok while doing nothing (done: 0)
+ *   - a job whose last run is older than its own schedule allows
+ *
+ * What it cannot catch: a step inside a job that skips itself while the job as
+ * a whole still reports ok. That has to be fixed where the job counts its work
+ * — a step that is skipped is not a step that succeeded.
+ *
+ * Configure with `checks.silent-jobs`:
+ *   { "ignore": ["dashboard"], "graceDays": { "daily": 2, "weekdays": 4, "weekly": 8, "monthly": 32 } }
+ */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { listJobs } from "../core/jobs.mjs";

@@ -1,5 +1,7 @@
-// The pipeline's "last update" line must not lag behind its newest log entry.
-// Configure: pipeline = { file, updateLine: "Last update", logHeading: "## Log" }.
+/**
+ * The pipeline's "last update" line must not lag behind its newest log entry.
+ * Configure: pipeline = { file, updateLine: "Last update", logHeading: "## Log" }.
+ */
 const DATE = /\b(20\d\d-\d\d-\d\d)\b/g;
 
 export default {
