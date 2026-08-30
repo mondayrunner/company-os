@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// What the agents did, newest first. The inbox answers "what needs me"; this
-// answers "what happened". Keeping those apart is the whole point: an inbox
-// that also carries finished work stops being a to-do list and becomes a feed.
+/**
+ * What the agents did, newest first. The inbox answers "what needs me"; this
+ * answers "what happened". Keeping those apart is the whole point: an inbox
+ * that also carries finished work stops being a to-do list and becomes a feed.
+ */
 const { fmt } = useConfig()
 const { data, status, refresh } = useLazyFetch<any>("/api/activity", { server: false })
 

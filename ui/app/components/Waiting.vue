@@ -1,6 +1,8 @@
 <script setup lang="ts">
-// The only waiting state in the whole dashboard. The same everywhere: a sign
-// that turns, a word that changes, and how long it has been going.
+/**
+ * The only waiting state in the whole dashboard. The same everywhere: a sign
+ * that turns, a word that changes, and how long it has been going.
+ */
 const props = defineProps<{ active: boolean; detail?: string | null; small?: boolean }>()
 const { word, elapsed } = useWaiting(toRef(props, "active"))
 </script>

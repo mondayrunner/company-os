@@ -22,7 +22,7 @@
   --color-success-bg: var(--th-success-bg);
 
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-henry: ui-serif, Georgia, serif;
+  --font-display: ui-serif, Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
 }
 

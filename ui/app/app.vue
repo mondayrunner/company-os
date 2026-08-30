@@ -43,7 +43,7 @@ const links = computed(() => [
         <img v-if="cfg.logo" :src="cfg.logo" :alt="cfg.name" class="h-5 w-auto block" />
         <span v-else class="text-red text-[15px]">✦</span>
       </NuxtLink>
-      <span class="font-henry italic text-[17px] text-ink-2 shrink-0 leading-none self-center hidden xl:inline">{{ cfg.title }}</span>
+      <span class="font-display italic text-[17px] text-ink-2 shrink-0 leading-none self-center hidden xl:inline">{{ cfg.title }}</span>
       <nav class="flex gap-px rounded-full bg-header ring-1 ring-line overflow-x-auto shrink-0 max-w-[46vw] lg:max-w-none [scrollbar-width:none]">
         <NuxtLink
           v-for="l in links"

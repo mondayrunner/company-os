@@ -1,7 +1,9 @@
 <script setup lang="ts">
-// What is on: every connector and job from the config, with its state. The
-// dashboard is a mirror of company-os.config.json — turning something off is
-// one line there, and it disappears here.
+/**
+ * What is on: every connector and job from the config, with its state. The
+ * dashboard is a mirror of company-os.config.json — turning something off is
+ * one line there, and it disappears here.
+ */
 const { fmt } = useConfig()
 const { data: sys, refresh: refreshSys, status: sysStatus } = useLazyFetch<any>("/api/system", { server: false })
 const { data: mod } = useLazyFetch<any>("/api/modules", { server: false })

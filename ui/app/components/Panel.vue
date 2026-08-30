@@ -1,6 +1,8 @@
 <script setup lang="ts">
-// Each panel fetches its own data: sources run from 200 ms to a minute, and the
-// fast ones should not wait for the slow ones.
+/**
+ * Each panel fetches its own data: sources run from 200 ms to a minute, and the
+ * fast ones should not wait for the slow ones.
+ */
 const props = defineProps<{ title: string; api: string; span?: string; anchor?: string; to?: string; toLabel?: string }>()
 const { data, error, refresh, status } = useLazyFetch<any>(`/api/${props.api}`, { server: false, key: `panel-${props.api}` })
 const busy = computed(() => status.value === "pending")

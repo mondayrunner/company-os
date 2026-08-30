@@ -1,10 +1,12 @@
 <script setup lang="ts">
-// The inbox: what the brain wants to change and you have not seen yet. Three
-// kinds — a proposal (approve applies it), a finding (approve acknowledges it,
-// reject silences it) and a report (read it, or type what to do and approve).
-// Approving runs the item at once; there is no waiting room between the two.
-// Built for triage, because findings arrive in batches: move with j/k, open
-// with e, approve with a, reject with r, select with x for bulk actions.
+/**
+ * The inbox: what the brain wants to change and you have not seen yet. Three
+ * kinds — a proposal (approve applies it), a finding (approve acknowledges it,
+ * reject silences it) and a report (read it, or type what to do and approve).
+ * Approving runs the item at once; there is no waiting room between the two.
+ * Built for triage, because findings arrive in batches: move with j/k, open
+ * with e, approve with a, reject with r, select with x for bulk actions.
+ */
 const { fmt } = useConfig()
 const { data, status, refresh } = useLazyFetch<any>("/api/inbox", { server: false })
 const content = computed(() => (data.value?.ok ? data.value.data : null))
