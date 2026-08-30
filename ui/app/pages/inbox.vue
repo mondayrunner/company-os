@@ -55,13 +55,16 @@ async function act(action: string, id?: string, text?: string) {
   finally { working.value = null }
 }
 
-// While something is running, keep asking. Five seconds is often enough to feel
-// live without making a run of several minutes into a few hundred requests.
+// Keep asking, always — items can land here from the CLI or another agent's
+// MCP session, not only from a run in this tab. Five seconds while something
+// is running (a spinner that lags feels broken); fifteen otherwise, so an idle
+// tab still catches up on its own without hammering the server.
 let ticker: ReturnType<typeof setInterval> | null = null
-watch(running, (r) => {
-  if (r.length && !ticker) ticker = setInterval(() => refresh(), 5000)
-  else if (!r.length && ticker) { clearInterval(ticker); ticker = null }
-}, { immediate: true })
+function schedule(ms: number) {
+  if (ticker) clearInterval(ticker)
+  ticker = setInterval(() => refresh(), ms)
+}
+watch(running, (r) => schedule(r.length ? 5000 : 15000), { immediate: true })
 onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
 async function bulk(action: "approve" | "reject") {
   const ids = actionable.value.map((i: any) => i.id)
@@ -168,8 +171,8 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
               <pre v-if="i.reply" class="whitespace-pre-wrap font-sans text-[12.5px] text-ink-2 border-l-2 border-line pl-3">{{ i.reply }}</pre>
               <pre v-if="i.result" class="whitespace-pre-wrap font-mono text-[11.5px] text-ink-3 border-l-2 border-line pl-3">{{ i.result }}</pre>
               <div v-if="['open', 'approved'].includes(i.status)" class="flex items-start gap-2">
-                <input :id="`reply-${i.id}`" v-model="reply[i.id]" type="text" :placeholder="i.kind === 'report' ? 'read it, then say what you want done with it…' : 'answer or instruction, then approve…'" class="grow bg-header ring-1 ring-line rounded-lg px-3 py-1.5 text-[13px] outline-none focus:ring-ink-3" @keydown.enter="act('reply', i.id, reply[i.id])" />
-                <button class="text-[12px] px-3 py-1.5 rounded-full ring-1 ring-line hover:bg-header disabled:opacity-40 shrink-0" :disabled="working === i.id" @click="act('reply', i.id, reply[i.id])">reply</button>
+                <input :id="`reply-${i.id}`" v-model="reply[i.id]" type="text" :placeholder="i.kind === 'report' ? 'read it, or say what you want done and it runs…' : 'answer or instruction; reply runs it…'" class="grow bg-header ring-1 ring-line rounded-lg px-3 py-1.5 text-[13px] outline-none focus:ring-ink-3" @keydown.enter="act('approve', i.id, reply[i.id])" />
+                <button class="text-[12px] px-3 py-1.5 rounded-full ring-1 ring-line hover:bg-header disabled:opacity-40 shrink-0" :disabled="working === i.id || !(reply[i.id] ?? '').trim()" @click="act('approve', i.id, reply[i.id])">reply &amp; run</button>
               </div>
             </div>
           </div>

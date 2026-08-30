@@ -9,6 +9,13 @@ const busy = computed(() => status.value === "pending")
 const fault = computed(() => error.value?.message || (data.value && !data.value.ok ? data.value.error : null))
 const content = computed(() => (data.value?.ok ? data.value.data : null))
 const took = computed(() => (data.value?.ms != null ? `${(data.value.ms / 1000).toFixed(1)}s` : null))
+
+// Every panel keeps itself current on its own — the ↻ stays for "I need it
+// right now". Skip a tick while a fetch is already in flight (some sources
+// take up to a minute) instead of stacking requests.
+let ticker: ReturnType<typeof setInterval> | null = null
+onMounted(() => { ticker = setInterval(() => { if (!busy.value) refresh() }, 20000) })
+onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
 </script>
 
 <template>
