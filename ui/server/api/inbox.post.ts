@@ -28,6 +28,9 @@ export default defineEventHandler(async (event) => {
   if (action === "run") {
     const { start, finish, list, record } = await import("#core/running.mjs")
     const context = ctx()
+    // Running everything while a single run is still going would hand the same
+    // approved item to two executors; an `agent` action would then run twice.
+    if (!id && list(context).length) return { ok: false, error: "a run is already going — wait for it before running all" }
     const key = id ?? "all"
 
     // Already going: say so instead of starting a second one on the same item.

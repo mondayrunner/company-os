@@ -15,7 +15,7 @@ import { list as running } from "#core/running.mjs"
  */
 export default defineEventHandler(async (event) =>
   source("Activity", async () => {
-    const limit = Math.min(Number(getQuery(event).limit ?? 60), 200)
+    const limit = Math.min(Number(getQuery(event).limit ?? 60), 1000)
     const db = openDb(ctx())
     try {
       const rows = db

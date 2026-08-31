@@ -61,7 +61,7 @@ async function run(name: string) {
             <span v-else-if="j.state === 'unknown'" class="ml-auto text-ink-3 text-[11px] shrink-0">no status yet</span>
             <span v-else class="ml-auto text-[11px] shrink-0" :class="j.stale ? 'text-orange' : 'text-success'">{{ j.stale ? `${j.age}d quiet` : "ok" }}</span>
             <button v-if="!j.service" class="ml-1.5 text-ink-3 hover:text-red transition-colors text-[12px] px-1 shrink-0 disabled:opacity-40" :disabled="working === j.name" title="run now (same as: company-os jobs run)" @click="run(j.name)">{{ working === j.name ? "…" : "▶" }}</button>
-            <button class="text-ink-3 hover:text-ink transition-colors text-[11px] px-1 shrink-0" title="last run and log tail" @click="logOpen = logOpen === j.name ? null : j.name">{{ logOpen === j.name ? "▾" : "▸" }}</button>
+            <button class="text-ink-3 hover:text-ink transition-colors text-[11px] px-1 shrink-0" title="last run and log tail" @click="logOpen = logOpen === j.name ? null : j.name">{{ logOpen === j.name ? "▾ log" : "log" }}</button>
           </div>
           <p v-if="j.lastRun" class="text-[11px] text-ink-3 px-4 pb-1.5 pl-9 truncate">{{ fmt.when(j.lastRun) }}<span v-if="j.message"> · {{ j.message }}</span></p>
           <pre v-if="logOpen === j.name" class="mx-4 mb-2 ml-9 rounded-lg bg-header px-2.5 py-2 text-[10.5px] leading-snug text-ink-2 whitespace-pre-wrap break-all max-h-40 overflow-auto">{{ j.tail?.length ? j.tail.join("\n") : "no log yet" }}

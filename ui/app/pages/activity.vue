@@ -5,7 +5,8 @@
  * that also carries finished work stops being a to-do list and becomes a feed.
  */
 const { fmt } = useConfig()
-const { data, status, refresh } = useLazyFetch<any>("/api/activity", { server: false })
+const limit = ref(60)
+const { data, status, refresh } = useLazyFetch<any>("/api/activity", { server: false, query: { limit } })
 
 const content = computed(() => (data.value?.ok ? data.value.data : null))
 const busy = computed(() => status.value === "pending")
@@ -83,6 +84,8 @@ onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
       <div v-if="content && !content.rows.length" class="rounded-2xl ring-1 ring-line bg-card p-4 text-[13px] text-ink-3">
         Nothing yet. Runs land here as jobs and agents finish.
       </div>
+
+      <button v-if="content && (content.rows?.length ?? 0) >= limit" class="mb-4 text-[12px] text-ink-3 hover:text-ink px-3 py-1.5 rounded-full ring-1 ring-line transition-colors" @click="limit += 120">older ↓</button>
 
       <p class="text-[11px] text-ink-3 mt-4 leading-relaxed">
         Every job writes a row here through its status file; runs you start yourself — an inbox item, a role on a card, a

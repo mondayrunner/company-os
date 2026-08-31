@@ -13,7 +13,10 @@ const componentFor = (name: string) => {
 
 <template>
   <div class="h-full overflow-y-auto p-3 space-y-3">
-    <StatStrip />
+    <!-- StatStrip is off (31-08): the numbers repeat what the panels below
+         already show, and the strip was not clickable. Put the line back to
+         bring it back. -->
+    <!-- <StatStrip /> -->
     <div class="grid gap-3 grid-cols-1 md:grid-cols-2 auto-rows-[18rem] xl:grid-cols-4">
       <template v-for="p in panels" :key="p.name">
         <component :is="componentFor(p.component)" v-if="componentFor(p.component)" />

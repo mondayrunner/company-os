@@ -24,7 +24,8 @@
  *   body … / ## Reply … / ## Result …
  */
 import { mkdir, readdir, readFile, writeFile, rename } from "node:fs/promises";
-import { join, dirname, resolve, sep } from "node:path";
+import { join, dirname, basename, resolve, sep } from "node:path";
+import { realpathSync } from "node:fs";
 import { frontmatter, setFrontmatter, hashOf } from "./markdown.mjs";
 import { runAgent } from "./run.mjs";
 import { languageName } from "./config.mjs";
@@ -126,10 +127,17 @@ export async function reply(ctx, id, text = "", { status = null } = {}) {
   return parseItem(out, file);
 }
 
-/** A path from an action, resolved against the root; anything outside it is refused. */
+/**
+ * A path from an action, resolved against the root; anything outside it is
+ * refused. Real paths on both sides, because `resolve()` does not follow
+ * symlinks: a link inside the vault pointing out of it would otherwise pass.
+ */
 function inside(ctx, rel) {
   const file = resolve(ctx.path(String(rel ?? "")));
-  if (file !== ctx.root && !file.startsWith(ctx.root + sep)) throw new Error(`refused: ${rel} is outside the root`);
+  let real = file;
+  try { real = realpathSync(file); } catch { try { real = join(realpathSync(dirname(file)), basename(file)); } catch {} }
+  const root = realpathSync(ctx.root);
+  if (real !== root && !real.startsWith(root + sep)) throw new Error(`refused: ${rel} is outside the root`);
   return file;
 }
 
