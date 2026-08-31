@@ -103,7 +103,7 @@ Reading: `account`, `accounts`, `canon`, `search`, `mail`, `finance`, `tasks`, `
 
 ## Dashboard
 
-`ui/` is a Nuxt app that shows the brain: overview, inbox, activity, status. It is a view. It polls for changes every few seconds, so a card you create from Claude Code shows up within seconds. A private dashboard can `extends` it and add its own pages. See `ui/README.md`.
+`ui/` is a Nuxt app that shows the brain: overview, inbox, activity, status. It is a view. Buttons that start an agent should start one you can watch: our own layer hands those runs to a terminal workspace (herdr) instead of a background process, and says so when it is down. The engine itself has no such dependency — a layer chooses its own runner. It polls for changes every few seconds, so a card you create from Claude Code shows up within seconds. A private dashboard can `extends` it and add its own pages. See `ui/README.md`.
 
 ## Status
 
