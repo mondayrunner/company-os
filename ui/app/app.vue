@@ -26,16 +26,16 @@ const live = useLive()
 // adds. Inbox sits second, because that is the one page that asks something of
 // you — and it carries the count, so you see it from any other page.
 const links = computed(() => {
+  // Activity and Status live in the settings menu (top right), not here:
+  // they are about the system, the nav is about the work.
   const base = [
     { p: "/", t: "Overview" },
     { p: "/inbox", t: "Inbox", badge: () => live.inboxOpen.value },
-    { p: "/activity", t: "Activity" },
-    { p: "/status", t: "Status", badge: () => live.jobsBad.value },
   ]
-  // A layer's nav entries slot in before Activity; one that names a base page is dropped, not doubled.
-  const own = cfg.value.nav.filter((l: any) => !base.some((b) => b.p === l.p))
-  return [base[0], base[1], ...own, base[2], base[3]]
+  const own = cfg.value.nav.filter((l: any) => !base.some((b) => b.p === l.p) && !["/activity", "/status"].includes(l.p))
+  return [...base, ...own]
 })
+const menuOpen = ref(false)
 </script>
 
 <template>
@@ -66,7 +66,16 @@ const links = computed(() => {
         </NuxtLink>
       </nav>
       <p class="text-[13px] text-ink-3 first-letter:uppercase hidden 2xl:block whitespace-nowrap">{{ today }}</p>
-      <button class="ml-auto text-[11px] px-2.5 py-1 rounded-full ring-1 ring-line text-ink-3 hover:text-ink hover:ring-ink-3 transition-colors" :title="`Theme: ${theme}`" @click="cycle">{{ theme === "system" ? "auto" : theme }}</button>
+      <div class="ml-auto relative">
+        <button class="text-[13px] px-2.5 py-1 rounded-full ring-1 ring-line text-ink-3 hover:text-ink hover:ring-ink-3 transition-colors relative" title="settings, activity and modules" @click="menuOpen = !menuOpen">
+          ⚙<span v-if="live.jobsBad.value" class="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red" />
+        </button>
+        <div v-if="menuOpen" class="absolute right-0 top-9 z-50 w-48 rounded-xl bg-card ring-1 ring-line shadow-xl py-1.5 text-[13px]" @click="menuOpen = false">
+          <NuxtLink to="/activity" class="flex items-center gap-2 px-3.5 py-2 text-ink hover:bg-header">Activity</NuxtLink>
+          <NuxtLink to="/status" class="flex items-center gap-2 px-3.5 py-2 text-ink hover:bg-header">Modules &amp; jobs<span v-if="live.jobsBad.value" class="ml-auto text-[11px] px-1.5 rounded-full bg-red text-white">{{ live.jobsBad.value }}</span></NuxtLink>
+          <button class="w-full flex items-center gap-2 px-3.5 py-2 text-ink hover:bg-header" @click.stop="cycle">Theme<span class="ml-auto text-[11px] text-ink-3">{{ theme === "system" ? "auto" : theme }}</span></button>
+        </div>
+      </div>
       <span
         class="size-1.5 rounded-full shrink-0 transition-colors"
         :class="live.fresh.value ? 'bg-red animate-ping' : 'bg-success/60'"

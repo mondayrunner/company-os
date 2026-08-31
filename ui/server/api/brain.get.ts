@@ -16,7 +16,7 @@ export default defineEventHandler(async () =>
       },
       byKind: s.byKind,
       sources: s.sources,
-      transcripts: { total: s.transcriptsTotal, open: open.length, recent: open.slice(0, 12) },
+      transcripts: { total: s.transcriptsTotal, open: open.length, recent: open.slice(0, 12), all: open.slice(0, 200) },
       runs: s.latestRuns,
     }
   }),
