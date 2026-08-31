@@ -54,9 +54,14 @@ export default {
   async live(query, ctx, options) {
     const what = query?.what ?? "subscriptions";
     if (what === "subscriptions") {
-      const status = query.status ?? "active";
-      const subs = await api(options, `subscriptions?status=${status}&expand[]=data.customer`);
-      return { items: subs.map(normalizeSubscription), fetched: new Date().toISOString() };
+      // Default matches Stripe's own MRR definition: active plus past_due.
+      // Only counting "active" hides exactly the subscriptions that are about
+      // to become a problem, and disagrees with the number in the Stripe app.
+      const status = query.status ?? null;
+      const lists = status
+        ? [await api(options, `subscriptions?status=${status}&expand[]=data.customer`)]
+        : await Promise.all(["active", "past_due"].map((s) => api(options, `subscriptions?status=${s}&expand[]=data.customer`)));
+      return { items: lists.flat().map(normalizeSubscription), fetched: new Date().toISOString() };
     }
     if (what === "revenue") {
       // Paid invoices per month, net of VAT — gross would show revenue the tax
@@ -87,6 +92,6 @@ export default {
       { date, key: "open_invoices", value: open.items.length }, { date, key: "open_invoices_amount", value: open.items.reduce((s, x) => s + x.amount, 0) },
       { date, key: "open_invoices_overdue", value: open.items.filter((x) => x.overdue).length },
     ];
-    return { metrics, count: subs.items.length, message: `${subs.items.length} active subscriptions, MRR ${metrics[0].value}` };
+    return { metrics, count: subs.items.length, message: `${subs.items.length} subscriptions (incl. past due), MRR ${metrics[0].value}` };
   },
 };

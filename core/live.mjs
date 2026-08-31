@@ -17,9 +17,11 @@ export async function finance(ctx) {
   if (!subs) return { error: "no live finance connector" };
   const open = (await readLive(ctx, "finance", { what: "open-invoices" }).catch((e) => ({ items: [], error: e.message }))) ?? { items: [] };
   const mrr = subs.items.reduce((s, x) => s + (x.monthly ?? 0), 0);
+  const pastDue = subs.items.filter((x) => x.status === "past_due");
   const overdue = open.items.filter((i) => i.overdue);
   return {
     mrr: round(mrr), arr: round(mrr * 12), subscriptions: subs.items.length,
+    pastDue: { n: pastDue.length, monthly: round(pastDue.reduce((s, x) => s + (x.monthly ?? 0), 0)) },
     openInvoices: open.items.length, openAmount: round(open.items.reduce((s, i) => s + (i.amount ?? 0), 0)),
     overdueInvoices: overdue.length, overdueAmount: round(overdue.reduce((s, i) => s + (i.amount ?? 0), 0)),
     items: { subscriptions: subs.items, openInvoices: open.items },
