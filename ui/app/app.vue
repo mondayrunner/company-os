@@ -72,7 +72,7 @@ const menuOpen = ref(false)
         </button>
         <div v-if="menuOpen" class="absolute right-0 top-9 z-50 w-48 rounded-xl bg-card ring-1 ring-line shadow-xl py-1.5 text-[13px]" @click="menuOpen = false">
           <NuxtLink to="/activity" class="flex items-center gap-2 px-3.5 py-2 text-ink hover:bg-header">Activity</NuxtLink>
-          <NuxtLink to="/status" class="flex items-center gap-2 px-3.5 py-2 text-ink hover:bg-header">Modules &amp; jobs<span v-if="live.jobsBad.value" class="ml-auto text-[11px] px-1.5 rounded-full bg-red text-white">{{ live.jobsBad.value }}</span></NuxtLink>
+          <NuxtLink to="/status" class="flex items-center gap-2 px-3.5 py-2 text-ink hover:bg-header">System<span v-if="live.jobsBad.value" class="ml-auto text-[11px] px-1.5 rounded-full bg-red text-white">{{ live.jobsBad.value }}</span></NuxtLink>
           <button class="w-full flex items-center gap-2 px-3.5 py-2 text-ink hover:bg-header" @click.stop="cycle">Theme<span class="ml-auto text-[11px] text-ink-3">{{ theme === "system" ? "auto" : theme }}</span></button>
         </div>
       </div>
