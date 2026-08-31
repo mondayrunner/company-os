@@ -19,7 +19,7 @@ Pages: `/` overview, `/inbox` answer and approve, `/activity` what ran, `/status
 
 ## Making it yours
 
-`ui.title`, `ui.logo`, `ui.nav` and `ui.panels` in the config cover the small stuff. For real changes, use it as a Nuxt layer:
+`ui.title`, `ui.logo`, `ui.nav`, `ui.panels` and `ui.links` (panel api → external url, e.g. `"finance": "https://…"`) in the config cover the small stuff. For real changes, use it as a Nuxt layer:
 
 ```ts
 // my-dashboard/nuxt.config.ts

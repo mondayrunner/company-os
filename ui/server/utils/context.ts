@@ -25,5 +25,8 @@ export function publicConfig() {
     // Which panels the overview shows, in this order. Empty: derive from the
     // live kinds — see usePanels().
     panels: ui.panels ?? [],
+    // External links per panel (api name → url): "finance" to your bookkeeping,
+    // "tasks" to your board. The engine names no vendor; the config does.
+    links: ui.links ?? {},
   }
 }
