@@ -7,7 +7,7 @@
  * an earlier draft. Never marks anything as read, never sends. A draft lands in the Drafts folder and stays there until a human
  * sends it from the mail client.
  *
- *   "imap": { "envFile": "~/.config/sitelane-mail/.env", "host": "127.0.0.1", "port": 1143,
+ *   "imap": { "envFile": "~/.config/mail/.env", "host": "127.0.0.1", "port": 1143,
  *             "secure": false, "userName": "BRIDGE_USER", "passName": "BRIDGE_PASS",
  *             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>" }
  *
