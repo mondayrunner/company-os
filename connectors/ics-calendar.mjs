@@ -25,13 +25,14 @@ function parseDate(value, utc) {
 }
 
 function parseRrule(s) {
-  const r = { freq: null, interval: 1, byday: [], until: null };
+  const r = { freq: null, interval: 1, byday: [], until: null, count: null };
   for (const part of s.split(";")) {
     const [k, v] = part.split("=");
     if (k === "FREQ") r.freq = v;
     else if (k === "INTERVAL") r.interval = parseInt(v, 10) || 1;
     else if (k === "BYDAY") r.byday = v.split(",").map((d) => DAYCODE[d.slice(-2)]).filter((n) => n !== undefined);
     else if (k === "UNTIL") r.until = parseDate(v, /Z$/.test(v));
+    else if (k === "COUNT") r.count = parseInt(v, 10) || null;
   }
   return r;
 }
@@ -61,6 +62,36 @@ export function parseEvents(lines) {
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const midnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
+/**
+ * How many occurrences the series has produced up to and including `target`.
+ * Walks day by day, which is fine: series with a COUNT are short by nature,
+ * and the walk stops at the target or at the count, whichever comes first.
+ */
+function countUntil(ev, target) {
+  const r = ev.rrule;
+  const days = new Set(r.byday?.length ? r.byday : [ev.start.getDay()]);
+  let n = 0;
+  const limit = midnight(target).getTime();
+  for (let d = midnight(ev.start); d.getTime() <= limit; d.setDate(d.getDate() + 1)) {
+    if (n > (r.count ?? Infinity)) break;
+    const t = new Date(d);
+    const hit =
+      r.freq === "DAILY" ? Math.round((t - midnight(ev.start)) / DAY) % r.interval === 0 :
+      r.freq === "WEEKLY" ? days.has(t.getDay()) && weekAligned(ev.start, t, r.interval) :
+      r.freq === "MONTHLY" ? t.getDate() === ev.start.getDate() && ((t.getFullYear() - ev.start.getFullYear()) * 12 + t.getMonth() - ev.start.getMonth()) % r.interval === 0 :
+      r.freq === "YEARLY" ? t.getMonth() === ev.start.getMonth() && t.getDate() === ev.start.getDate() && (t.getFullYear() - ev.start.getFullYear()) % r.interval === 0 :
+      false;
+    if (hit) n++;
+  }
+  return n;
+}
+
+function weekAligned(start, target, interval) {
+  const a = new Date(start.getFullYear(), start.getMonth(), start.getDate() - start.getDay());
+  const t = new Date(target.getFullYear(), target.getMonth(), target.getDate() - target.getDay());
+  return Math.round((t - a) / (7 * DAY)) % interval === 0;
+}
+
 export function occursOn(ev, target) {
   const start = ev.start;
   if (target < midnight(start)) return false;
@@ -72,6 +103,9 @@ export function occursOn(ev, target) {
   }
   const r = ev.rrule;
   if (r.until && target > r.until) return false;
+  // COUNT ends a series just as surely as UNTIL. Ignoring it resurrected a
+  // six-week bootcamp from January on every following Tuesday, forever.
+  if (r.count && countUntil(ev, target) > r.count) return false;
   switch (r.freq) {
     case "DAILY": return Math.round((target - midnight(start)) / DAY) % r.interval === 0;
     case "WEEKLY": {
