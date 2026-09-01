@@ -41,9 +41,9 @@ const openId = ref<string | null>(null)
 const current = computed(() => flat.value.find((i: any) => i.id === openId.value) ?? null)
 // The URL owns the selection: clicking pushes a query, the watcher follows it,
 // and the browser's back button walks the same trail in reverse.
-function show(id: string) { if (id !== openId.value) router.push({ query: { ...route.query, id } }) }
-watch(() => route.query.id, (id) => { openId.value = typeof id === "string" ? id : null }, { immediate: true })
-watch(() => flat.value[0]?.id, () => { if (!route.query.id && !openId.value && flat.value[0]) openId.value = flat.value[0].id })
+function show(id: string) { if (id !== openId.value) router.push({ path: `/inbox/${id}`, query: route.query }) }
+watch(() => route.params.id, (id) => { openId.value = typeof id === "string" && id ? id : null }, { immediate: true })
+watch(() => flat.value[0]?.id, () => { if (!route.params.id && !openId.value && flat.value[0]) openId.value = flat.value[0].id })
 
 const actionable = computed(() => flat.value.filter((i: any) => checked.value.has(i.id) && ["open", "approved"].includes(i.status) && i.kind !== "report"))
 const doLabel: Record<string, string> = { drift: "fix it", proposal: "apply", question: "answer", report: "do it" }
