@@ -49,3 +49,16 @@ export async function mailDraft(ctx, { to, subject, body } = {}) {
     return { draft: result, source: connector };
   });
 }
+
+/**
+ * A board with its lists. Reversible the way a board is: you close it, and a
+ * closed board can be reopened. Creating one is still a visible act in someone
+ * else's workspace, so `core/boards.mjs` shows the plan before it calls this.
+ */
+export async function createBoard(ctx, { title, lists = [], desc = "" } = {}) {
+  if (!title) throw new Error("createBoard needs a title");
+  return traced(ctx, "create board", `${title} · ${lists.length} lists`, async () => {
+    const { connector, result } = await doAct(ctx, "tasks", "create-board", { title, lists, desc });
+    return { board: result, source: connector };
+  });
+}

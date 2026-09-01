@@ -7,6 +7,8 @@ company-os init            # a config in your folder
 company-os index           # markdown → index
 company-os account harper  # one account: status, ball, pipeline row, last contact
 company-os canon pricing   # the one file prices live in
+company-os ticket 6a9413   # one card as a brief: description, checklists, attachments on disk
+company-os boards          # the boards this brain expects; --create makes what is missing
 company-os check           # drift: stale pages, dead links, pipeline vs. folders, copied figures
 company-os serve           # the same answers as MCP tools, for Claude Code or Cursor
 ```
@@ -41,6 +43,16 @@ Every company brain has the same four parts (after *The Ontology of the Company 
 
 One rule follows from this: **figures that live in a system of record (MRR in Stripe, cards in Trello) are never copied into markdown.** The brain reads them live and snapshots a few numbers a day. A copy starts ageing the moment you make it, and `check` flags copies.
 
+## The base version picks the tools
+
+A brain that plugs into anything is a brain you have to wire up before it does anything. So the base version chooses: **Trello** for the work, **Paraspeech** for what was said, **Stripe** for what came in. Three sources, three questions a company asks itself every day. The connector contract underneath stays open, so swap any of them or write your own — you just do not have to start there.
+
+Trello is the one it also sets up. `company-os boards` reads the boards from your config, says which are missing and creates them when you add `--create`; `company-os boards "Acme" --create` adds one client board from the template. The rest leans on those names: the column where a client's open work lives is found by its name, and a board the brain made carries an agreement instead of a hope.
+
+`company-os ticket <card>` then turns one card into a brief an agent can start on: description, checklists, comments, and the attachments downloaded to disk — a Trello attachment URL is private, so a link nobody can open is not a brief. A card with nothing on it at all comes back `empty` instead of sending an agent off to guess what the job was.
+
+Paraspeech files recordings of ten minutes or more into the transcript inbox with a proposal for who they were with. `company-os link` attaches the ones it is sure about, and the `unfiled-transcripts` check names the ones still waiting — otherwise that folder is the one place where doing nothing looks exactly like being up to date. Stripe answers the money questions live, and `subscriptions-vs-accounts` says when a subscription and a folder disagree.
+
 ## Configuration
 
 Everything is `company-os.config.json` at the root of your folder. Folder names are yours; the config says which folder plays which role.
@@ -70,7 +82,7 @@ export default {
 }
 ```
 
-Built in: `markdown`, `status`, `metrics-http`, `stripe`, `trello`, `tasks-markdown`, `ics-calendar`, `imap`. Put a private one in `<folder>/connectors/<name>.mjs` and company-os finds it first. `act()` is for what the source itself can undo: a card, a draft, a move. Sending, paying and publishing are not actions and will not be. Secrets come from an env file the connector names, never from the folder. Details: [docs/extending.md](docs/extending.md).
+Built in: `markdown`, `status`, `metrics-http`, `stripe`, `trello`, `tasks-markdown`, `paraspeech`, `ics-calendar`, `imap`. Put a private one in `<folder>/connectors/<name>.mjs` and company-os finds it first. `act()` is for what the source itself can undo: a card, a draft, a move. Sending, paying and publishing are not actions and will not be. Secrets come from an env file the connector names, never from the folder. Details: [docs/extending.md](docs/extending.md).
 
 ## Checks
 
@@ -99,7 +111,7 @@ Every finding and proposal is one markdown file in `inbox/`, fingerprinted so th
 claude mcp add company-os -e COMPANY_OS_ROOT=/path/to/your/folder -- company-os serve
 ```
 
-Reading: `account`, `accounts`, `canon`, `search`, `mail`, `finance`, `tasks`, `calendar`, `live`, `status`, `check`. Writing, reversible and logged: `todo`, `task_done`, `mail_draft`. Talking back: `inbox_post`, `inbox_list`.
+Reading: `account`, `accounts`, `canon`, `search`, `mail`, `finance`, `tasks`, `calendar`, `live`, `ticket`, `status`, `check`. Writing, reversible and logged: `todo`, `task_done`, `mail_draft`. Talking back: `inbox_post`, `inbox_list`.
 
 ## Dashboard
 

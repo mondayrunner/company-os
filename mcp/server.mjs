@@ -19,7 +19,8 @@ import { finance, tasks, calendar, mail } from "../core/live.mjs";
 import { todo, taskDone, mailDraft } from "../core/actions.mjs";
 import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
-import { postItem, listItems } from "../core/inbox.mjs";
+import { ticket } from "../core/ticket.mjs";
+import { postItem, listItems, reply as replyItem } from "../core/inbox.mjs";
 
 // Descriptions are written for an agent that has never seen this company:
 // when to use the tool, what comes back, what to do next.
@@ -38,9 +39,11 @@ export const TOOLS = [
   { name: "task_done", description: "Move a card to the done list (or another list by name). Reversible.", inputSchema: { type: "object", properties: { id: { type: "string" }, list: { type: "string" } }, required: ["id"] } },
   { name: "mail_draft", description: "File a draft in the mail client's Drafts folder: to, subject, body (plain text; you write it, this only files it). Replaces an earlier draft with the same subject to the same address. Never sends — the human does that from the mail client.", inputSchema: { type: "object", properties: { to: { type: "string" }, subject: { type: "string" }, body: { type: "string" } }, required: ["to", "subject", "body"] } },
   { name: "live", description: "Read a live source now: kind = tasks (what: cards) | finance (subscriptions, open-invoices) | calendar (today, range from/to) | mail (unread). Never copy these numbers into markdown.", inputSchema: { type: "object", properties: { kind: { type: "string" }, what: { type: "string" }, from: { type: "string" }, to: { type: "string" }, limit: { type: "number" } }, required: ["kind"] } },
+  { name: "ticket", description: "One card on the task board as a brief you can start on: description, checklists, comments, and any attachment downloaded to disk so you can open it. Use it when someone points you at a ticket instead of reading the board yourself. `empty: true` means the card says nothing at all — ask the human then, do not guess a job.", inputSchema: { type: "object", properties: { id: { type: "string" }, repo: { type: "string", description: "optional: the folder to work in, named in the brief" }, who: { type: "string", description: "optional: who the ticket is for" } }, required: ["id"] } },
   { name: "check", description: "Run the deterministic checks (stale pages, dead links, pipeline drift, copied figures, subscriptions vs accounts, silent jobs). Findings become inbox items.", inputSchema: { type: "object", properties: { live: { type: "boolean", default: true } } } },
   { name: "inbox_post", description: "Talk back to the human: post a question, proposal or finding to the inbox. The human replies there; approval runs the item (from the dashboard at once, from the CLI via `company-os inbox run`).", inputSchema: { type: "object", properties: { kind: { type: "string", enum: ["question", "proposal", "drift", "report"] }, title: { type: "string" }, body: { type: "string" }, action: { type: "object", description: "optional: {type: edit-markdown|set-frontmatter|move-file|agent, …}" } }, required: ["title", "body"] } },
   { name: "inbox_list", description: "List inbox items, optionally by status (open, approved, rejected, done, failed).", inputSchema: { type: "object", properties: { status: { type: "string" } } } },
+  { name: "inbox_reply", description: "Reply to an inbox item and/or change its status. Use status: rejected to close an item that needs no action (a report you've read, a finding already handled elsewhere); status: approved to mark a proposal accepted for `company-os inbox run` to execute. Never use this to mark an outward action as sent — that stays the human's job.", inputSchema: { type: "object", properties: { id: { type: "string" }, text: { type: "string", default: "" }, status: { type: "string", enum: ["open", "approved", "rejected", "done"] } }, required: ["id"] } },
   { name: "status", description: "What is in the brain: counts, sources, latest runs.", inputSchema: { type: "object", properties: {} } },
 ];
 
@@ -64,9 +67,11 @@ export async function callTool(ctx, db, name, args = {}) {
       const { kind, ...query } = args;
       return { connector: c.name, ...(await c.live(query, ctx, c.options)) };
     }
+    case "ticket": return ticket(ctx, args.id, { repo: args.repo ?? null, who: args.who ?? null });
     case "check": { const r = await runChecks(ctx, db, { live: args.live ?? true }); return { errors: r.errors, warnings: r.warnings, findings: r.findings, skipped: r.skipped, inbox: r.inbox }; }
     case "inbox_post": return postItem(ctx, { kind: args.kind ?? "question", from: "agent", title: args.title, body: args.body, action: args.action ?? null });
     case "inbox_list": return (await listItems(ctx, { status: args.status ?? null })).map(({ id, kind, from, created, status, title, action }) => ({ id, kind, from, created, status, title, action }));
+    case "inbox_reply": { const it = await replyItem(ctx, args.id, args.text ?? "", { status: args.status ?? null }); return { id: it.id, status: it.status, reply: it.reply }; }
     case "status": return status(db, ctx);
     default: throw new Error(`unknown tool ${name}`);
   }

@@ -79,7 +79,34 @@ company-os snapshot     # one row of numbers per day, for the line later
 
 Which sources exist and how to write your own: [extending.md](extending.md).
 
-## 6. Let it run
+## 6. Make the boards, pick up a ticket
+
+The base version expects three kinds of board: one for sales, one for your own
+to-do list, and one per client. It makes them itself, so the column names are an
+agreement instead of something you have to remember to type the same way twice.
+
+```bash
+company-os boards                   # what exists, what is missing
+company-os boards --create          # make what is missing
+company-os boards "Acme" --create   # one client board from the template
+```
+
+Rename the lists under `boards` in the config first if you want other names.
+Nothing is created without `--create`, and a board that already carries the name
+is left alone, so running it twice is safe.
+
+With a board in place, one card is a briefing:
+
+```bash
+company-os ticket 6a9413 --repo ~/code/acme-site
+```
+
+Description, checklists, comments, and every attachment downloaded to disk, so
+whoever picks it up can open the screenshot instead of staring at a private URL.
+Pipe it into the agent you use. A card with nothing on it says so, instead of
+starting a session that has to guess what the work was.
+
+## 7. Let it run
 
 ```bash
 company-os jobs install   # launchd, cron or systemd, whichever this machine has
@@ -89,7 +116,7 @@ company-os jobs list
 Every job writes the same status file, rotates its own log and adds a row to
 the run history. When one goes quiet you see it, which is the point.
 
-## 7. Open the dashboard
+## 8. Open the dashboard
 
 ```bash
 cd ui && npm install && npx nuxt dev

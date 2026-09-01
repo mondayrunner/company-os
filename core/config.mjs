@@ -53,6 +53,15 @@ export const DEFAULTS = {
   search: { stopwords: null, weights: {}, raw: null },
   // Canonical files by short name: the one place a fact lives. `company-os canon pricing`.
   canon: {},
+  // The boards this brain expects and the lists on them. `company-os boards`
+  // says what is missing, `--create` makes it; `boards.client` is the template
+  // for one board per customer. Rename the lists and everything follows: the
+  // brain made them, so the names are an agreement instead of a convention.
+  boards: {
+    sales: { title: "Sales", lists: ["Leads", "In contact", "Proposal", "Won", "Lost"] },
+    todo: { title: "TODO", lists: ["Today", "This week", "Later", "Done"] },
+    client: { title: "{name}", lists: ["Current request", "In progress", "Review", "Done"] },
+  },
   link: { namesModule: null, extraAccountDirs: [], editors: "ghostty|cursor|sublime|iterm|terminal|claude|code", strongSources: null, weakSources: null },
 };
 

@@ -10,6 +10,7 @@
  *   canon [key] [--section]   a canonical file by short name
  *   mail | finance | tasks | calendar   live sources, answer-shaped
  *   live <kind> [what]        any live source, raw
+ *   ticket <id> [--repo dir]  one card as a brief an agent can start on
  *   status                    what is in the brain
  *
  * Writing, reversible and logged
@@ -18,6 +19,7 @@
  *   draft --to --title --file a draft in the mail client, never sent
  *
  * Keeping it honest
+ *   boards [--create]         the boards this brain expects, made if you ask
  *   check [--no-live]         deterministic checks, report and inbox items
  *   link [--dry-run]          attach waiting transcripts to accounts
  *   inbox list|show|post|reply|approve|reject|run   where agents talk back and you answer
@@ -45,6 +47,8 @@ import { recordEvent } from "../core/status.mjs";
 import { link, linkSmart } from "../core/link.mjs";
 import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
+import { ticket } from "../core/ticket.mjs";
+import { boards } from "../core/boards.mjs";
 import { postItem, listItems, reply, runApproved } from "../core/inbox.mjs";
 import { serve } from "../mcp/server.mjs";
 import { install, uninstall, runJob, listJobs } from "../core/jobs.mjs";
@@ -57,7 +61,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a.startsWith("--")) {
     const k = a.slice(2);
-    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id", "target", "side", "section", "uid", "limit", "mailbox", "board", "to", "due", "list", "body"].includes(k)) flags[k] = argv[++i];
+    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id", "target", "side", "section", "uid", "limit", "mailbox", "board", "to", "due", "list", "body", "repo", "who", "client"].includes(k)) flags[k] = argv[++i];
     else flags[k] = true;
   } else positional.push(a);
 }
@@ -95,6 +99,14 @@ try {
     case "todo": out(await todo(ctx, { title: rest.join(" "), body: flags.body ?? "", due: flags.due ?? null, list: flags.list ?? null })); break;
     case "task-done": out(await taskDone(ctx, { id: rest[0], list: flags.list ?? null })); break;
     case "draft": out(await mailDraft(ctx, { to: flags.to, subject: flags.title, body: flags.file ? readFileSync(flags.file, "utf8") : rest.join(" ") })); break;
+    case "ticket": {
+      // The brief is text on purpose: pipe it into an agent, or read it yourself.
+      const r = await ticket(ctx, rest[0], { repo: flags.repo ?? null, who: flags.who ?? null, files: !flags["no-files"] });
+      if (flags.json || r.error) out(r);
+      else { if (r.empty) console.error(`(nothing on this card: no description, checklist, comment or attachment)`); console.log(r.brief); }
+      break;
+    }
+    case "boards": out(await boards(ctx, { create: !!flags.create, client: flags.client ?? rest[0] ?? null })); break;
     case "status": out(status(db, ctx)); break;
     case "link": {
       const dryRun = !!flags["dry-run"];
@@ -161,11 +173,13 @@ function help() {
   link [--dry-run] [--smart] attach waiting transcripts to accounts
   check [--no-live] [--only a,b] [--json]   deterministic checks → report + status
   live <kind> [what] [k=v]   read a live source raw (tasks cards, finance subscriptions, calendar today, mail unread)
+  ticket <id> [--repo d] [--who name] [--no-files] [--json]   one card as a brief: description, checklists, comments, attachments on disk
   mail [query] [--uid n]     mail with the body: search, one by uid, or the latest unread
   finance | tasks | calendar [--from d --to d]   live sources, answer-shaped
   todo "title" [--body ..] [--due d] [--list l]   a card on the task board (reversible, logged)
   task-done <id> [--list l]  move a card to done (reversible, logged)
   draft --to a --title s --file body.txt   a draft in the mail client (never sends)
+  boards [client name] [--create]   the boards this brain expects; shows the plan, --create makes what is missing
   inbox list|post|reply|approve|reject|show|run   agents talk back here; approved items get executed
   serve                      MCP server over stdio for agents
   jobs list|install|uninstall|run <name>   schedule the config's jobs on launchd, cron or systemd
