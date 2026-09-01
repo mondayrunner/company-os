@@ -16,7 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadConnectors, byKind, readLive } from "./connectors.mjs";
 import { clean, slug, tableUnder, hashOf } from "./markdown.mjs";
 import { writeStatus } from "./status.mjs";
-import { postItem, resolveStale } from "./inbox.mjs";
+import { postItem, resolveStale, expireReports } from "./inbox.mjs";
 
 const BUILTIN = join(dirname(fileURLToPath(import.meta.url)), "..", "checks");
 
@@ -146,6 +146,7 @@ export async function runChecks(ctx, db, { live = true, only = null } = {}) {
     // closes and whether a new one is posted.
     const stamped = findings.map((f) => ({ ...f, fingerprint: hashOf(`${f.check}|${f.where}|${f.what}`).slice(0, 8) }));
     closed = await resolveStale(ctx, "check", stamped.map((f) => f.fingerprint));
+    closed = closed.concat(await expireReports(ctx));
     for (const f of stamped) {
       const r = await postItem(ctx, { kind: "drift", from: "check", title: f.what.replace(/\n/g, " ").slice(0, 120), where: `${f.where}${f.line ? `:${f.line}` : ""}`, fingerprint: f.fingerprint,
         body: `**${f.severity}** · check \`${f.check}\` · \`${f.where}${f.line ? `:${f.line}` : ""}\`\n\n${f.what}\n\nReply with what to do (and approve), or reject to silence this finding.`, action: f.action ?? null });

@@ -241,6 +241,25 @@ export async function resolveStale(ctx, from, liveFingerprints) {
   return closed;
 }
 
+/**
+ * A report is something to read, and reading has a window. One that sat open
+ * for a week was either seen and left, or not worth seeing; both mean closed.
+ * Without this the inbox grows a tail of finished news and the count stops
+ * meaning "waiting for you". Runs with the checks, like resolveStale.
+ */
+export async function expireReports(ctx, { days = 7 } = {}) {
+  const cutoff = Date.now() - days * 864e5;
+  const closed = [];
+  for (const item of await listItems(ctx, { status: "open" })) {
+    if (item.kind !== "report" || !item.created || new Date(item.created).getTime() > cutoff) continue;
+    const { file, text } = await itemFile(ctx, item.id);
+    const stamp = `_${new Date().toISOString().slice(0, 16).replace("T", " ")}_ ✓ open for ${days} days; a report expires on its own.`;
+    await writeFile(file, setFrontmatter(appendUnder(text, "Result", stamp), { status: "done" }));
+    closed.push(item.id);
+  }
+  return closed;
+}
+
 /** Mirror the inbox folder into the `inbox` table. */
 export async function indexInbox(ctx, db) {
   const items = await listItems(ctx);

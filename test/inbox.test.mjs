@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { loadContext } from "../core/config.mjs";
 import { openDb } from "../core/db.mjs";
 import { indexAll } from "../core/index.mjs";
-import { postItem, listItems, reply, runApproved, indexInbox } from "../core/inbox.mjs";
+import { postItem, listItems, reply, runApproved, indexInbox, expireReports } from "../core/inbox.mjs";
 import { runChecks } from "../core/checks.mjs";
 import { TOOLS, callTool } from "../mcp/server.mjs";
 
@@ -68,6 +68,18 @@ test("outward actions are refused", async () => {
   const r = await runApproved(ctx, { only: id });
   assert.equal(r[0].ok, false); assert.match(r[0].message, /refused/);
   assert.equal((await listItems(ctx)).find((i) => i.id === id).status, "failed");
+});
+
+test("an open report expires after its window; the rest stays", async () => {
+  const { id } = await postItem(ctx, { kind: "report", from: "agent", title: "Old news", body: "…" });
+  const { readFile: rf, writeFile: wf } = await import("node:fs/promises");
+  const file = join(ctx.root, "inbox", `${id}.md`);
+  await wf(file, (await rf(file, "utf8")).replace(/created: .*/, "created: 2026-01-01T00:00:00Z"));
+  const closed = await expireReports(ctx, { days: 7 });
+  assert.ok(closed.includes(id));
+  const items = await listItems(ctx);
+  assert.equal(items.find((i) => i.id === id).status, "done");
+  assert.ok(!items.some((i) => i.kind !== "report" && closed.includes(i.id)));
 });
 
 test("actions cannot reach outside the root", async () => {
