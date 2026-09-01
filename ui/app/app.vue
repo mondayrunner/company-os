@@ -48,7 +48,7 @@ const active = "bg-card text-ink font-semibold ring-1 ring-line"
       <NuxtLink to="/" class="flex items-center gap-2 px-2.5 pb-4">
         <img v-if="cfg.logo" :src="cfg.logo" :alt="cfg.name" class="h-5 w-auto block" />
         <span v-else class="text-red text-[15px]">✦</span>
-        <span class="font-display italic text-[15px] text-ink-2 leading-none truncate">{{ cfg.title }}</span>
+        <span class="font-display italic text-[15px] text-ink-2 leading-none truncate mt-1">{{ cfg.title }}</span>
       </NuxtLink>
 
       <NuxtLink v-for="l in links" :key="l.p" :to="l.p" :class="[item, $route.path === l.p ? active : idle]">
