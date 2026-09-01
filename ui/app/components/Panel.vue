@@ -29,7 +29,7 @@ onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
       <span v-if="busy" class="size-1.5 rounded-full bg-red animate-pulse" aria-label="loading" />
       <span v-else-if="fault" class="size-1.5 rounded-full bg-red" aria-label="error" />
       <NuxtLink v-if="to" :to="to" class="ml-auto text-[11px] text-ink-3 hover:text-red transition-colors shrink-0">{{ toLabel ?? "all" }} →</NuxtLink>
-      <a v-else-if="ext" :href="ext" target="_blank" class="ml-auto text-[11px] text-ink-3 hover:text-red transition-colors shrink-0">{{ toLabel ?? "board" }} ↗</a>
+      <a v-else-if="ext" :href="ext" target="_blank" class="ml-auto text-[11px] text-ink-3 hover:text-red transition-colors shrink-0">{{ toLabel ?? "open" }} ↗</a>
       <button class="text-ink-3 hover:text-red transition-colors text-[11px] px-2 py-1 -mr-2 rounded-full disabled:opacity-40" :class="!to && !ext && 'ml-auto'" :disabled="busy" :title="took ? `last fetch took ${took}` : undefined" @click="refresh()">↻</button>
     </header>
     <div class="px-4 py-2.5 overflow-y-auto grow min-h-0">
