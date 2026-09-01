@@ -35,9 +35,15 @@ const flat = computed(() => sections.value.flatMap((s) => s.items))
 
 // The pane shows one item; the cursor and the pane are the same thing, so
 // j/k reads the inbox the way j/k reads a mailbox.
+const route = useRoute()
+const router = useRouter()
 const openId = ref<string | null>(null)
 const current = computed(() => flat.value.find((i: any) => i.id === openId.value) ?? null)
-watch(() => flat.value[0]?.id, () => { if (!openId.value && flat.value[0]) openId.value = flat.value[0].id })
+// The URL owns the selection: clicking pushes a query, the watcher follows it,
+// and the browser's back button walks the same trail in reverse.
+function show(id: string) { if (id !== openId.value) router.push({ query: { ...route.query, id } }) }
+watch(() => route.query.id, (id) => { openId.value = typeof id === "string" ? id : null }, { immediate: true })
+watch(() => flat.value[0]?.id, () => { if (!route.query.id && !openId.value && flat.value[0]) openId.value = flat.value[0].id })
 
 const actionable = computed(() => flat.value.filter((i: any) => checked.value.has(i.id) && ["open", "approved"].includes(i.status) && i.kind !== "report"))
 const doLabel: Record<string, string> = { drift: "fix it", proposal: "apply", question: "answer", report: "do it" }
@@ -83,7 +89,7 @@ function toggleCheck(id: string) {
 function move(step: number) {
   if (!flat.value.length) return
   const i = Math.max(0, Math.min(flat.value.length - 1, flat.value.findIndex((x: any) => x.id === openId.value) + step))
-  openId.value = flat.value[i].id
+  show(flat.value[i].id)
   nextTick(() => document.getElementById(`item-${openId.value}`)?.scrollIntoView({ block: "nearest" }))
 }
 
@@ -136,7 +142,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
             :key="i.id"
             class="w-full flex items-start gap-2 text-left py-2 px-3 border-l-2 transition-colors"
             :class="[checked.has(i.id) ? 'border-l-red' : 'border-l-transparent', openId === i.id ? 'bg-red-soft' : 'hover:bg-cream', s.dim && 'opacity-60']"
-            @click="openId = i.id"
+            @click="show(i.id)"
           >
             <span class="text-[9px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5" :class="kindTone[i.kind] || kindTone.report">{{ i.kind }}</span>
             <span class="min-w-0 grow">
