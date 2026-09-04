@@ -107,7 +107,10 @@ export async function tickets(ctx, items = [], { desc = 2500, comments = 600, fi
   if (!items.length) return { error: "no tickets" };
   const cards = [];
   const missing = [];
-  for (const it of items) {
+  for (const [i, it] of items.entries()) {
+    // Trello counts requests per ten seconds, and one card is several of them.
+    // fetchRetry catches a 429; this is so it rarely has to.
+    if (i) await new Promise((r) => setTimeout(r, 250));
     const dir = files ? attachmentDir(ctx, it.id) : null;
     const r = await readLive(ctx, "tasks", { what: "card", id: it.id, files: dir });
     if (!r) return { error: "no live connector of kind tasks" };

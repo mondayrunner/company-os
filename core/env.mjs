@@ -29,11 +29,30 @@ export async function secret(options, name, { required = true } = {}) {
   return v;
 }
 
+/**
+ * fetch that waits and tries again.
+ *
+ * Three cases, deliberately not the same. A connection that never happened is
+ * always safe to repeat. A 429 is the server saying "not yet", so repeating it
+ * is the whole point — Trello hands one out as soon as you read a dozen cards
+ * in a row. A 5xx only gets repeated for a read: a write that may have landed
+ * is not something you send twice.
+ */
 export async function fetchRetry(url, init = {}, attempts = 3) {
+  const read = !init.method || init.method.toUpperCase() === "GET";
   let last;
   for (let i = 0; i < attempts; i++) {
-    try { return await fetch(url, init); }
-    catch (e) { last = e; if (i < attempts - 1) await new Promise((r) => setTimeout(r, 500 * 2 ** i)); }
+    const backoff = 500 * 2 ** i;
+    try {
+      const r = await fetch(url, init);
+      if (i < attempts - 1 && (r.status === 429 || (read && r.status >= 500))) {
+        const after = Number(r.headers.get("retry-after"));
+        await new Promise((f) => setTimeout(f, Number.isFinite(after) && after > 0 ? Math.min(after * 1000, 10_000) : backoff));
+        continue;
+      }
+      return r;
+    } catch (e) { last = e; if (i < attempts - 1) await new Promise((f) => setTimeout(f, backoff)); }
   }
-  throw last;
+  if (last) throw last;
+  return fetch(url, init);
 }
