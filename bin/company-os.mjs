@@ -10,7 +10,7 @@
  *   canon [key] [--section]   a canonical file by short name
  *   mail | finance | tasks | calendar   live sources, answer-shaped
  *   live <kind> [what]        any live source, raw
- *   ticket <id> [--repo dir]  one card as a brief an agent can start on
+ *   ticket <id>… [--repo dir] cards as a brief an agent can start on
  *   status                    what is in the brain
  *
  * Writing, reversible and logged
@@ -47,7 +47,7 @@ import { recordEvent } from "../core/status.mjs";
 import { link, linkSmart } from "../core/link.mjs";
 import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
-import { ticket } from "../core/ticket.mjs";
+import { ticket, tickets } from "../core/ticket.mjs";
 import { boards } from "../core/boards.mjs";
 import { postItem, listItems, reply, runApproved } from "../core/inbox.mjs";
 import { serve } from "../mcp/server.mjs";
@@ -101,7 +101,10 @@ try {
     case "draft": out(await mailDraft(ctx, { to: flags.to, subject: flags.title, body: flags.file ? readFileSync(flags.file, "utf8") : rest.join(" ") })); break;
     case "ticket": {
       // The brief is text on purpose: pipe it into an agent, or read it yourself.
-      const r = await ticket(ctx, rest[0], { repo: flags.repo ?? null, who: flags.who ?? null, files: !flags["no-files"] });
+      // More than one id is one brief for one agent, not one brief each.
+      const r = rest.length > 1
+        ? await tickets(ctx, rest.map((id) => ({ id, repo: flags.repo ?? null, who: flags.who ?? null })), { files: !flags["no-files"] })
+        : await ticket(ctx, rest[0], { repo: flags.repo ?? null, who: flags.who ?? null, files: !flags["no-files"] });
       if (flags.json || r.error) out(r);
       else { if (r.empty) console.error(`(nothing on this card: no description, checklist, comment or attachment)`); console.log(r.brief); }
       break;
@@ -173,7 +176,7 @@ function help() {
   link [--dry-run] [--smart] attach waiting transcripts to accounts
   check [--no-live] [--only a,b] [--json]   deterministic checks → report + status
   live <kind> [what] [k=v]   read a live source raw (tasks cards, finance subscriptions, calendar today, mail unread)
-  ticket <id> [--repo d] [--who name] [--no-files] [--json]   one card as a brief: description, checklists, comments, attachments on disk
+  ticket <id>… [--repo d] [--who name] [--no-files] [--json]   cards as a brief: description, checklists, comments, attachments on disk (more ids = one brief for one agent)
   mail [query] [--uid n]     mail with the body: search, one by uid, or the latest unread
   finance | tasks | calendar [--from d --to d]   live sources, answer-shaped
   todo "title" [--body ..] [--due d] [--list l]   a card on the task board (reversible, logged)
