@@ -104,11 +104,24 @@ export async function link(ctx, { dryRun = false } = {}) {
     if (!dryRun && ctx.config.inbox?.fromLink !== false) {
       const rel = `${ctx.config.transcripts.inbox}/${b}`;
       await postItem(ctx, { kind: "question", from: "link", title: `Which account does this transcript belong to?`, where: rel, fingerprint: `l${hashPart(rel)}`,
-        body: `Transcript \`${rel}\` is not linked to an account.${scores.length ? `\n\nCandidates: ${scores.slice(0, 3).map((s) => `\`${s.account}\` (${s.names.join(", ")})`).join(", ")}` : "\n\nNo account name recognised."}\n\nReply with the account path (or \`internal\`) and approve.`,
+        body: `${describe(meta, body)}\n\n${scores.length ? `Candidates: ${scores.slice(0, 3).map((s) => `\`${s.account}\` (${s.names.join(", ")})`).join(", ")}` : "No account name recognised."}\n\nReply with the account path (or \`internal\`) and approve.`,
         action: { type: "set-frontmatter", file: rel, field: keys.account } });
     }
   }
   return out;
+}
+
+/**
+ * What the transcript is, so the question can be answered without opening
+ * the file: when, how long, which app, and the first stretch of the talk.
+ */
+function describe(meta, body) {
+  const date = String(meta.date ?? meta.datum ?? "").replace("T", " ").slice(0, 16);
+  const minutes = Math.round(Number(meta.duration_s ?? meta.duur_s ?? 0) / 60);
+  const facts = [date, minutes ? `${minutes} min` : "", meta.kind ?? meta.soort ?? "", meta.app ? `via ${meta.app}` : ""].filter(Boolean).join(" · ");
+  const transcript = body.split(/^## Transcript\s*$/m)[1] ?? body;
+  const head = transcript.replace(/\s+/g, " ").trim().slice(0, 500);
+  return `${facts}\n\n> ${head}${transcript.trim().length > 500 ? "…" : ""}`;
 }
 
 async function accountList(ctx) {

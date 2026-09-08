@@ -37,6 +37,16 @@ const flat = computed(() => sections.value.flatMap((s) => s.items))
 // j/k reads the inbox the way j/k reads a mailbox.
 const route = useRoute()
 const router = useRouter()
+
+// `where` is a repo path. When a layer on top of this UI has a page for that
+// kind of file (transcripts/… → /transcripts/…), the path becomes a link;
+// without such a page it stays plain text.
+function whereLink(where: string): string | null {
+  const m = where.match(/^transcripts\/(.+\.md)$/)
+  if (!m) return null
+  const to = `/transcripts/${m[1]}`
+  return router.resolve(to).matched.length ? to : null
+}
 const openId = ref<string | null>(null)
 const current = computed(() => flat.value.find((i: any) => i.id === openId.value) ?? null)
 // The URL owns the selection: clicking pushes a query, the watcher follows it,
@@ -164,7 +174,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
           <h1 class="text-[15px] font-semibold text-ink leading-snug">{{ current.title }}</h1>
           <p class="text-[11.5px] text-ink-3 mt-0.5">
             {{ current.kind }} · from {{ current.from }} · {{ fmt.when(current.created) }}
-            <span v-if="current.where" class="font-mono"> · {{ current.where }}</span>
+            <span v-if="current.where" class="font-mono"> · <NuxtLink v-if="whereLink(current.where)" :to="whereLink(current.where)!" class="text-ink-2 hover:text-red hover:underline" title="open the transcript">{{ current.where }} ↗</NuxtLink><template v-else>{{ current.where }}</template></span>
             <span v-if="current.action" class="font-mono"> · action: {{ current.action.type }}</span>
           </p>
         </div>
