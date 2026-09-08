@@ -23,7 +23,7 @@ async function run(name: string) {
   working.value = name; note.value = null
   try {
     const r: any = await $fetch("/api/kickstart", { method: "POST", body: { name } })
-    note.value = { name, ok: !!r?.ok, text: r?.ok ? "started" : r?.error || "failed" }
+    note.value = { name, ok: !!r?.ok, text: r?.ok ? (r.opened === "herdr" ? (r.busy ? "already running in herdr" : "runs in herdr") : "started") : r?.error || "failed" }
     setTimeout(() => refreshSys(), 4000)
   } catch (e: any) { note.value = { name, ok: false, text: e?.data?.error || "failed" } }
   finally { working.value = null; setTimeout(() => { if (note.value?.name === name) note.value = null }, 6000) }
