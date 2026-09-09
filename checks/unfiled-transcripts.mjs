@@ -38,11 +38,14 @@ export default {
     }
     open.sort((a, b) => a.date.localeCompare(b.date));
 
-    const findings = open.slice(0, max).map((t) => ({
-      severity: "warn", where: t.rel,
-      what: `recording from ${t.date} is not attached to an account${t.proposal.length ? ` (proposed: ${t.proposal.join(", ")})` : ""}`,
-    }));
-    if (open.length > max) findings.push({ severity: "warn", where: dir, what: `${open.length} recordings are waiting to be attached, ${open.length - max} more than shown; \`company-os link\` attaches what it is sure about` });
-    return findings;
+    // One finding for the pile, not one per recording: `link` already asks one
+    // question per transcript, and this is the count that says the pile exists.
+    if (!open.length) return [];
+    const shown = open.slice(0, max).map((t) => `${t.date}${t.proposal.length ? ` (${t.proposal.join(", ")}?)` : ""}`).join(", ");
+    return [{
+      severity: "warn", where: dir,
+      what: `${open.length} recording${open.length === 1 ? " is" : "s are"} waiting to be attached to an account, oldest ${shown}${open.length > max ? `, +${open.length - max} more` : ""}`,
+      hint: "Each has its own question from `link` in this inbox: answer those (account path, `internal`, or `none` for a casual contact) and this closes by itself.",
+    }];
   },
 };

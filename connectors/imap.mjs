@@ -12,6 +12,7 @@
  *             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>" }
  *
  * live({ what: "unread", limit: 40 })           → { unread, items: [{ uid, subject, from, address, date }] }
+ * live({ what: "since", days: 30, limit: 300 })  → { found, items: [{ uid, subject, from, address, to, date }] }  headers only
  * live({ what: "search", query, limit: 5 })     → { items: [{ uid, subject, from, address, to, date, body, attachments }] }
  * live({ what: "read", uid })                   → { item }
  * act("draft", { to, subject, body })           → { mailbox, subject, to, replaced }
@@ -153,6 +154,25 @@ async function open(options) {
 
 const quote = (s) => `"${String(s).replace(/["\\]/g, "\\$&")}"`;
 
+/** The date form IMAP SEARCH wants: 09-Sep-2026. */
+export const imapDate = (d) => { const M = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; return `${String(d.getUTCDate()).padStart(2, "0")}-${M[d.getUTCMonth()]}-${d.getUTCFullYear()}`; };
+
+const uidsOf = (search) => (search.match(/\* SEARCH([^\r\n]*)/)?.[1] ?? "").trim().split(/\s+/).filter(Boolean).map(Number);
+
+/** Headers only, newest first: what a listing needs without pulling bodies. */
+async function fetchHeaders(imap, uids) {
+  const items = [];
+  if (!uids.length) return items;
+  const res = await imap.cmd(`UID FETCH ${uids.join(",")} (UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])`);
+  for (const m of res.matchAll(/\* \d+ FETCH \(UID (\d+) BODY\[HEADER\.FIELDS \([^)]*\)\] \{(\d+)\}\r?\n([\s\S]*?)\r?\n\)/g)) {
+    const h = parseHeaders(m[3]);
+    const { from, address } = fromParts(h.from);
+    items.push({ uid: Number(m[1]), subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, date: h.date ? new Date(h.date).toISOString() : null });
+  }
+  items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  return items;
+}
+
 async function fetchOne(imap, uid) {
   const res = await imap.cmd(`UID FETCH ${uid} (UID BODY.PEEK[])`);
   const raw = literalOf(res);
@@ -176,20 +196,19 @@ export default {
     try {
       await imap.cmd(`EXAMINE ${quote(query?.mailbox ?? options?.mailbox ?? "INBOX")}`);
       if (what === "unread") {
-        const search = await imap.cmd("UID SEARCH UNSEEN");
-        const uids = (search.match(/\* SEARCH([^\r\n]*)/)?.[1] ?? "").trim().split(/\s+/).filter(Boolean).map(Number);
-        const latest = uids.slice(-(query.limit ?? 40));
-        const items = [];
-        if (latest.length) {
-          const res = await imap.cmd(`UID FETCH ${latest.join(",")} (UID BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE)])`);
-          for (const m of res.matchAll(/\* \d+ FETCH \(UID (\d+) BODY\[HEADER\.FIELDS \([^)]*\)\] \{(\d+)\}\r?\n([\s\S]*?)\r?\n\)/g)) {
-            const h = parseHeaders(m[3]);
-            const { from, address } = fromParts(h.from);
-            items.push({ uid: Number(m[1]), subject: h.subject ?? "(no subject)", from, address, date: h.date ? new Date(h.date).toISOString() : null });
-          }
-        }
-        items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+        const uids = uidsOf(await imap.cmd("UID SEARCH UNSEEN"));
+        const items = await fetchHeaders(imap, uids.slice(-(query.limit ?? 40)));
         return { unread: uids.length, items, fetched: new Date().toISOString() };
+      }
+      if (what === "since") {
+        // Everything that arrived in the last N days, headers only. One round
+        // trip per mailbox, so a check can match hundreds of mails against the
+        // folders locally instead of searching the server once per address.
+        const days = Number(query.days ?? 30);
+        const since = new Date(Date.now() - days * 86400000);
+        const uids = uidsOf(await imap.cmd(`UID SEARCH SINCE ${imapDate(since)}`)).sort((a, b) => b - a);
+        const items = await fetchHeaders(imap, uids.slice(0, query.limit ?? 300));
+        return { found: uids.length, items, fetched: new Date().toISOString() };
       }
       if (what === "read") {
         if (!query.uid) throw new Error("imap: read needs a uid");
@@ -197,8 +216,7 @@ export default {
       }
       if (what === "search") {
         if (!query.query) throw new Error("imap: search needs a query");
-        const search = await imap.cmd(`UID SEARCH TEXT ${quote(query.query)}`);
-        const uids = (search.match(/\* SEARCH([^\r\n]*)/)?.[1] ?? "").trim().split(/\s+/).filter(Boolean).map(Number).sort((a, b) => b - a);
+        const uids = uidsOf(await imap.cmd(`UID SEARCH TEXT ${quote(query.query)}`)).sort((a, b) => b - a);
         const items = [];
         for (const uid of uids.slice(0, query.limit ?? 5)) { const it = await fetchOne(imap, uid); if (it) items.push(it); }
         return { found: uids.length, items, fetched: new Date().toISOString() };

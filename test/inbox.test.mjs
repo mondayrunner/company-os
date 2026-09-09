@@ -62,6 +62,31 @@ test("set-frontmatter takes the value from the reply", async () => {
   assert.match(readFileSync(join(root, "knowledge/pricing.md"), "utf8"), /^account: accounts\/customers\/2026-02-01-globex-platform$/m);
 });
 
+test("edit-markdown with appendReply files the reply as a dated log line, and needs a reply", async () => {
+  const file = "accounts/leads/2026-01-15-acme-website/STATUS.md";
+  const { id } = await postItem(ctx, { kind: "question", from: "check", title: "appointment \"Kickoff Acme\" on 2026-09-05 is newer than the folder", body: "…",
+    action: { type: "edit-markdown", inward: true, file, appendReply: true, under: "Log", prefix: "- 2026-09-05 — Kickoff Acme: " } });
+  await reply(ctx, id, "", { status: "approved" });
+  let r = await runApproved(ctx, { only: id });
+  assert.equal(r[0].ok, false); assert.match(r[0].message, /no reply/);
+  await reply(ctx, id, "scope agreed, they send the copy by Friday", { status: "approved" });
+  r = await runApproved(ctx, { only: id });
+  assert.ok(r[0].ok, r[0].message);
+  assert.match(readFileSync(join(root, file), "utf8"), /## Log\n\n- 2026-09-05 — Kickoff Acme: scope agreed, they send the copy by Friday/);
+});
+
+test("a check-vouched (inward) action passes the word filter; a question without a reply is not run", async () => {
+  const { id } = await postItem(ctx, { kind: "proposal", from: "check", title: "2 mails newer than the folder", body: "…", action: { type: "edit-markdown", inward: true, file: "knowledge/pricing.md", append: "- read the mail, nothing changed" } });
+  await reply(ctx, id, "", { status: "approved" });
+  const r = await runApproved(ctx, { only: id });
+  assert.ok(r[0].ok, r[0].message);
+  const q = await postItem(ctx, { kind: "question", from: "check", title: "3 folders have neither a row nor a card", body: "…" });
+  await reply(ctx, q.id, "", { status: "approved" });
+  const rq = await runApproved(ctx, { only: q.id });
+  assert.equal(rq[0].skip, true);
+  assert.equal((await listItems(ctx)).find((i) => i.id === q.id).status, "open");
+});
+
 test("outward actions are refused", async () => {
   const { id } = await postItem(ctx, { kind: "proposal", from: "agent", title: "Send the invoice to Acme", body: "…" });
   await reply(ctx, id, "yes", { status: "approved" });
@@ -113,8 +138,9 @@ test("mcp: tools and a search call", async () => {
 test("a finding that stops appearing closes its own item", async () => {
   const { resolveStale } = await import("../core/inbox.mjs");
   const open = await listItems(ctx, { status: "open,approved" });
-  const victim = open.find((i) => i.from === "check");
-  const survivors = open.filter((i) => i.from === "check" && i.id !== victim.id).map((i) => i.fingerprint);
+  // The run summary is a report and is not a finding: it expires, it is never "no longer reported".
+  const victim = open.find((i) => i.from === "check" && i.kind !== "report");
+  const survivors = open.filter((i) => i.from === "check" && i.kind !== "report" && i.id !== victim.id).map((i) => i.fingerprint);
   const closed = await resolveStale(ctx, "check", survivors);
   assert.deepEqual(closed, [victim.id]);
   const after = (await listItems(ctx)).find((i) => i.id === victim.id);

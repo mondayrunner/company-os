@@ -5,6 +5,10 @@
  * a finding on a line a human already marked (config.markers) is dropped.
  *
  * A check is a module:  export default { name, description, needs?: ["finance"], run(ctx, h, options) -> findings[] }
+ * A finding: { severity, where, what, line?, action?, kind?, hint? }. `kind` is
+ * the inbox item it becomes (drift by default; proposal when an `action` is
+ * ready to run on approval; report for news that expires on its own), `hint`
+ * the one sentence under it that says what approving or replying does.
  * `options` is `config.checks.<name>` — its own settings, handed to it instead
  * of every check reaching into the whole config for its own corner of it.
  * Built-ins live in ../checks; private ones in <root>/checks/*.mjs.
@@ -109,11 +113,39 @@ export function makeHelpers(ctx, db, connectors) {
       return names;
     },
     live: (kind, query) => readLive(ctx, kind, query),
+    /**
+     * When a folder last changed: the newest mtime of any file in it, or 0.
+     * "The folder knows about it" means someone wrote it down there, and this
+     * is the cheapest honest proxy for that. Several checks compare a live
+     * source (a mail, a recording, an appointment) against it.
+     */
+    touched: async (rel) => {
+      const key = `touched:${rel}`;
+      if (cache.has(key)) return cache.get(key);
+      const p = (async () => {
+        let t = 0;
+        for (const f of await h.list(rel)) {
+          const s = await stat(ctx.path(`${rel}/${f}`)).catch(() => null);
+          if (s && s.mtimeMs > t) t = s.mtimeMs;
+        }
+        return t;
+      })();
+      cache.set(key, p);
+      return p;
+    },
+    /** Account folders on the open and won sides (or the sides given), flat. */
+    openAccounts: async (sides = null) => {
+      const a = ctx.config.accounts;
+      const wanted = sides ?? [...(a.openSides ?? []), ...(a.wonSides ?? [])];
+      const all = await h.accountFolders();
+      return Object.entries(all).filter(([side]) => !wanted.length || wanted.includes(side)).flatMap(([, fs]) => fs);
+    },
   };
   return h;
 }
 
-export async function runChecks(ctx, db, { live = true, only = null } = {}) {
+/** `job` names the status file: a scheduled subset (`--only mail-vs-accounts --job mail-check`) must not overwrite the weekly run's status. */
+export async function runChecks(ctx, db, { live = true, only = null, job = "check" } = {}) {
   const connectors = live ? await loadConnectors(ctx) : [];
   const checks = await loadChecks(ctx, only);
   const h = makeHelpers(ctx, db, connectors);
@@ -126,11 +158,12 @@ export async function runChecks(ctx, db, { live = true, only = null } = {}) {
       const options = ctx.config.checks?.[c.name];
       for (const f of (await c.run(ctx, h, options && typeof options === "object" ? options : {})) ?? []) {
         if (f.text && h.suppressed(f.text)) continue;
-        findings.push({ check: c.name, severity: f.severity ?? "warn", where: f.where, line: f.line ?? null, what: f.what, action: f.action ?? null });
+        findings.push({ check: c.name, severity: f.severity ?? "warn", where: f.where, line: f.line ?? null, what: f.what, action: f.action ?? null, kind: f.kind ?? "drift", hint: f.hint ?? null });
       }
     } catch (e) { findings.push({ check: c.name, severity: "error", where: c.name, what: `check crashed: ${e.message}` }); }
   }
-  findings.sort((a, b) => (a.severity === b.severity ? a.where.localeCompare(b.where) : a.severity === "error" ? -1 : 1));
+  const rank = { error: 0, warn: 1, info: 2 };
+  findings.sort((a, b) => ((rank[a.severity] ?? 1) - (rank[b.severity] ?? 1)) || a.where.localeCompare(b.where));
   const errors = findings.filter((f) => f.severity === "error").length;
   const date = new Date().toISOString().slice(0, 10);
   const report = renderReport(ctx, { date, checks, findings, skipped, errors });
@@ -145,15 +178,33 @@ export async function runChecks(ctx, db, { live = true, only = null } = {}) {
     // One fingerprint per finding: the same value decides whether an old item
     // closes and whether a new one is posted.
     const stamped = findings.map((f) => ({ ...f, fingerprint: hashOf(`${f.check}|${f.where}|${f.what}`).slice(0, 8) }));
-    closed = await resolveStale(ctx, "check", stamped.map((f) => f.fingerprint));
+    const ran = new Set(checks.filter((c) => !skipped.some((s) => s.check === c.name)).map((c) => c.name));
+    closed = await resolveStale(ctx, "check", stamped.map((f) => f.fingerprint), { within: (item, text) => [...ran].some((name) => text.includes(`check \`${name}\``)) });
     closed = closed.concat(await expireReports(ctx));
+    const news = [], fresh = [], refreshed = [];
     for (const f of stamped) {
-      const r = await postItem(ctx, { kind: "drift", from: "check", title: f.what.replace(/\n/g, " ").slice(0, 120), where: `${f.where}${f.line ? `:${f.line}` : ""}`, fingerprint: f.fingerprint,
-        body: `**${f.severity}** · check \`${f.check}\` · \`${f.where}${f.line ? `:${f.line}` : ""}\`\n\n${f.what}\n\nReply with what to do (and approve), or reject to silence this finding.`, action: f.action ?? null });
-      if (r.created) posted++;
+      // A finding says what it is (drift by default), and can say what approving
+      // does: a proposal carries an action, a question waits for a reply. Both
+      // become an item. A report is news ("9 cards made") and goes into the
+      // run's summary instead of taking a slot of its own.
+      if (f.kind === "report") { news.push(f); continue; }
+      const tail = `\n\n${f.hint ?? "Reply with what to do (and approve), or reject to silence this finding."}`;
+      const r = await postItem(ctx, { kind: f.kind, from: "check", title: f.what.replace(/\n/g, " ").slice(0, 120), where: `${f.where}${f.line ? `:${f.line}` : ""}`, fingerprint: f.fingerprint,
+        body: `**${f.severity}** · check \`${f.check}\` · \`${f.where}${f.line ? `:${f.line}` : ""}\`\n\n${f.what}${tail}`, action: f.action ?? null });
+      if (r.created) { posted++; fresh.push(f); } else if (r.updated) refreshed.push(f);
+    }
+    // One summary per run that did something: what was made, what is new, what
+    // closed. The human reads one item instead of counting tickets.
+    if (news.length || fresh.length || closed.length || refreshed.length) {
+      const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const lines = [`Ran ${checks.length - skipped.length} checks (\`${job}\`). ${findings.length} finding${findings.length === 1 ? "" : "s"}, ${posted} new in the inbox, ${closed.length} closed on their own${refreshed.length ? `, ${refreshed.length} rewritten with an action` : ""}.`];
+      if (news.length) lines.push("", "**Done by the checks**", ...news.map((f) => `- ${f.what}`));
+      if (fresh.length) lines.push("", "**New, waiting for you**", ...fresh.map((f) => `- ${f.kind === "proposal" ? "approve" : f.kind === "question" ? "answer" : "look"}: ${f.what.replace(/\n/g, " ").slice(0, 160)}`));
+      if (closed.length) lines.push("", `**Closed on their own:** ${closed.length}`);
+      await postItem(ctx, { kind: "report", from: "check", title: `Check run ${stamp}: ${news.length ? `${news.length} done, ` : ""}${posted} new, ${closed.length} closed`, fingerprint: `r${hashOf(`${job}|${stamp}`).slice(0, 7)}`, body: lines.join("\n") });
     }
   }
-  await writeStatus(ctx, "check", { result: errors ? "partial" : "ok", done: checks.length - skipped.length, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox${closed.length ? `, ${closed.length} closed` : ""}`, findings: findings.length, inbox_new: posted, inbox_closed: closed.length, report: ctx.short(file) });
+  await writeStatus(ctx, job, { result: errors ? "partial" : "ok", done: checks.length - skipped.length, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox${closed.length ? `, ${closed.length} closed` : ""}`, findings: findings.length, inbox_new: posted, inbox_closed: closed.length, report: ctx.short(file) });
   return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted, closed: closed.length } };
 }
 

@@ -81,7 +81,18 @@ export async function postItem(ctx, { kind = "report", from = "agent", title, bo
   // listing plus at most one parse — not a read of the whole inbox per finding.
   for (const f of (await readdir(dir).catch(() => [])).filter((f) => f.endsWith(`-${fp}.md`))) {
     const it = parseItem(await readFile(join(dir, f), "utf8"), join(dir, f));
-    if (it.fingerprint === fp && ["open", "approved", "rejected"].includes(it.status)) return { id: it.id, created: false, status: it.status };
+    if (it.fingerprint !== fp || !["open", "approved", "rejected"].includes(it.status)) continue;
+    // The same finding, but the check learned to say what approving does: the
+    // open item takes the new kind, action and text, and keeps its replies.
+    if (it.status === "open" && (it.kind !== kind || JSON.stringify(it.action) !== JSON.stringify(action) || it.description !== body.trim())) {
+      const text = await readFile(join(dir, f), "utf8");
+      const tail = text.slice(text.search(/^## Reply\s*$/m));
+      const head = ["---", `id: ${it.id}`, `kind: ${kind}`, `from: ${it.from}`, `created: ${it.created}`, "status: open", `title: ${String(title).replace(/\n/g, " ")}`,
+        where ?? it.where ? `where: ${where ?? it.where}` : null, `fingerprint: ${fp}`, action ? `action: ${JSON.stringify(action)}` : null, "---", "", body.trim(), ""].filter((l) => l !== null).join("\n");
+      await writeFile(join(dir, f), `${head}\n${tail.startsWith("## Reply") ? tail : `## Reply\n\n${tail}`}`);
+      return { id: it.id, created: false, updated: true, status: "open" };
+    }
+    return { id: it.id, created: false, status: it.status };
   }
   const created = new Date().toISOString();
   const id = `${created.slice(0, 10)}-${from.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${fp}`;
@@ -102,6 +113,11 @@ function appendUnder(text, heading, line) {
   return re.test(text)
     ? text.replace(new RegExp(`(^## ${heading}\\s*\\n)`, "m"), `$1\n${line}\n`)
     : `${text.trimEnd()}\n\n## ${heading}\n\n${line}\n`;
+}
+
+/** The newest line of the human's reply, without its timestamp. */
+function lastReplyLine(reply) {
+  return String(reply ?? "").split("\n").map((l) => l.replace(/^_[^_]*_\s*/, "").trim()).filter(Boolean).pop() ?? "";
 }
 
 // An id comes from a URL or a tool argument. It names a file under inbox/ and
@@ -144,10 +160,17 @@ function inside(ctx, rel) {
 async function applyAction(ctx, item) {
   const a = item.action;
   const instruction = item.reply || a?.instruction || "";
-  if (a?.outward || looksOutward(ctx, `${a?.type ?? ""} ${a?.instruction ?? ""} ${item.title}`) || (!a && looksOutward(ctx, instruction))) {
+  // `inward: true` is a check vouching for its own action: it reads a mail or a
+  // recording and writes a status file, and the word "mail" in that sentence is
+  // not a request to send one. The hard line stays: the executor cannot reach out.
+  if (a?.outward || (!a?.inward && looksOutward(ctx, `${a?.type ?? ""} ${a?.instruction ?? ""} ${item.title}`)) || (!a && looksOutward(ctx, instruction))) {
     return { ok: false, message: "refused: this looks like an outward action (send, publish, invoice). Do it by hand; the brain only edits its own files." };
   }
   if (!a) {
+    // A question with no action and no reply has nothing to run either.
+    if (item.kind === "question" && !item.reply) {
+      return { ok: false, skip: true, message: "a question waits for a reply — reply with the answer and approve that" };
+    }
     // A report is what an agent found out, not something to carry out. Running
     // one used to fall through to "fix what this finding describes", which sent
     // an agent off to execute a summary — it refused, correctly, and the item
@@ -162,19 +185,28 @@ async function applyAction(ctx, item) {
   switch (a.type) {
     case "edit-markdown": {
       const file = inside(ctx, a.file);
-      let text = await readFile(file, "utf8");
+      let text = await readFile(file, "utf8").catch((e) => { if (e.code === "ENOENT" && a.create) return ""; throw e; });
       for (const r of a.replace ?? []) {
         if (!text.includes(r.from)) return { ok: false, message: `text to replace not found in ${a.file}: ${r.from.slice(0, 60)}` };
         text = text.replace(r.from, r.to);
       }
       if (a.append) text = text.trimEnd() + "\n" + a.append + "\n";
+      // The human's reply is the line to write: "what came out of the call" goes
+      // under the log heading as a dated entry, with whatever prefix the check
+      // set ("- 2026-09-02 — Kickoff Harper: "). One sentence typed, one line filed.
+      if (a.appendReply) {
+        const line = lastReplyLine(item.reply);
+        if (!line) return { ok: false, message: "no reply: reply with the line to write and approve" };
+        text = appendUnder(text, a.under ?? "Log", `${a.prefix ?? `- ${new Date().toISOString().slice(0, 10)} — `}${line}`);
+      }
+      if (a.create) await mkdir(dirname(file), { recursive: true });
       await writeFile(file, text);
       return { ok: true, message: `edited ${a.file}` };
     }
     case "set-frontmatter": {
       const file = inside(ctx, a.file);
       const text = await readFile(file, "utf8");
-      const fields = a.fields ?? { [a.field]: a.value ?? item.reply.split("\n").pop().replace(/^_[^_]*_\s*/, "").trim() };
+      const fields = a.fields ?? { [a.field]: a.value ?? lastReplyLine(item.reply) };
       if (Object.values(fields).some((v) => !v)) return { ok: false, message: "no value: reply with the value to set" };
       const out = setFrontmatter(text, fields);
       if (!out) return { ok: false, message: `${a.file} has no frontmatter` };
@@ -228,12 +260,16 @@ export async function runApproved(ctx, { only = null } = {}) {
  * was fixed, the folder was made, the number was removed. Leaving it open makes
  * the inbox a graveyard, and you stop trusting the count.
  */
-export async function resolveStale(ctx, from, liveFingerprints) {
+export async function resolveStale(ctx, from, liveFingerprints, { within = null } = {}) {
   const live = new Set(liveFingerprints);
   const closed = [];
   for (const item of await listItems(ctx, { status: "open,approved" })) {
-    if (item.from !== from || !item.fingerprint || live.has(item.fingerprint)) continue;
+    // A report is news, not a finding; it expires by itself (expireReports).
+    if (item.from !== from || item.kind === "report" || !item.fingerprint || live.has(item.fingerprint)) continue;
     const { file, text } = await itemFile(ctx, item.id);
+    // A partial run (`check --only a,b`) knows nothing about the findings of
+    // the checks it did not run; those stay open until their own check runs.
+    if (within && !within(item, text)) continue;
     const stamp = `_${new Date().toISOString().slice(0, 16).replace("T", " ")}_ ✓ the check no longer reports this; closed on its own.`;
     await writeFile(file, setFrontmatter(appendUnder(text, "Result", stamp), { status: "done" }));
     closed.push(item.id);

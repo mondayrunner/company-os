@@ -20,7 +20,7 @@
  *
  * Keeping it honest
  *   boards [--create]         the boards this brain expects, made if you ask
- *   check [--no-live]         deterministic checks, report and inbox items
+ *   check [--no-live] [--only a,b] [--job name]  deterministic checks, report and inbox items
  *   link [--dry-run]          attach waiting transcripts to accounts
  *   inbox list|show|post|reply|approve|reject|run   where agents talk back and you answer
  *   snapshot | event <file>   daily metrics; record one job run
@@ -61,7 +61,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a.startsWith("--")) {
     const k = a.slice(2);
-    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id", "target", "side", "section", "uid", "limit", "mailbox", "board", "to", "due", "list", "body", "repo", "who", "client"].includes(k)) flags[k] = argv[++i];
+    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id", "target", "side", "section", "uid", "limit", "mailbox", "board", "to", "due", "list", "body", "repo", "who", "client", "job"].includes(k)) flags[k] = argv[++i];
     else flags[k] = true;
   } else positional.push(a);
 }
@@ -119,7 +119,7 @@ try {
       break;
     }
     case "check": {
-      const r = await runChecks(ctx, db, { live: !flags["no-live"], only: flags.only?.split(",") });
+      const r = await runChecks(ctx, db, { live: !flags["no-live"], only: flags.only?.split(","), job: flags.job ?? "check" });
       if (flags.json) out(r); else console.log(readFileSync(r.report, "utf8"));
       break;
     }
@@ -174,7 +174,7 @@ function help() {
   accounts [--side x]        one line per open and won account
   canon [key] [--section s]  a canonical file by short name (no key: list them)
   link [--dry-run] [--smart] attach waiting transcripts to accounts
-  check [--no-live] [--only a,b] [--json]   deterministic checks → report + status
+  check [--no-live] [--only a,b] [--job name] [--json]   deterministic checks → report + status
   live <kind> [what] [k=v]   read a live source raw (tasks cards, finance subscriptions, calendar today, mail unread)
   ticket <id>… [--repo d] [--who name] [--no-files] [--json]   cards as a brief: description, checklists, comments, attachments on disk (more ids = one brief for one agent)
   mail [query] [--uid n]     mail with the body: search, one by uid, or the latest unread

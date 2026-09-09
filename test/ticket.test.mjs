@@ -80,7 +80,10 @@ test("unfiled-transcripts: old and unattached is a finding, linked or fresh is n
   const { findings } = await runChecks(ctx, db, { live: false, only: ["unfiled-transcripts"] });
   db.close();
 
+  // One finding for the pile: it names the waiting recording (with its proposal), not the filed or the fresh one.
   assert.equal(findings.length, 1);
-  assert.equal(findings[0].where, "transcripts/_inbox/2026-01-02-aaaa.md");
-  assert.ok(findings[0].what.includes("2026-01-15-acme-website"));
+  assert.equal(findings[0].where, "transcripts/_inbox");
+  assert.match(findings[0].what, /^1 recording is waiting/);
+  assert.ok(findings[0].what.includes("2026-01-02") && findings[0].what.includes("2026-01-15-acme-website"));
+  assert.ok(!findings[0].what.includes(today));
 });

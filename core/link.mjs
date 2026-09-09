@@ -104,7 +104,7 @@ export async function link(ctx, { dryRun = false } = {}) {
     if (!dryRun && ctx.config.inbox?.fromLink !== false) {
       const rel = `${ctx.config.transcripts.inbox}/${b}`;
       await postItem(ctx, { kind: "question", from: "link", title: `Which account does this transcript belong to?`, where: rel, fingerprint: `l${hashPart(rel)}`,
-        body: `${describe(meta, body)}\n\n${scores.length ? `Candidates: ${scores.slice(0, 3).map((s) => `\`${s.account}\` (${s.names.join(", ")})`).join(", ")}` : "No account name recognised."}\n\nReply with the account path (or \`internal\`) and approve.`,
+        body: `${describe(meta, body)}\n\n${scores.length ? `Candidates: ${scores.slice(0, 3).map((s) => `\`${s.account}\` (${s.names.join(", ")})`).join(", ")}` : "No account name recognised."}\n\nReply with the account path and approve — or \`internal\` (own dictation) or \`none\` (a casual contact, not an account); both file it and it never comes back.`,
         action: { type: "set-frontmatter", file: rel, field: keys.account } });
     }
   }

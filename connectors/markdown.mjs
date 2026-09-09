@@ -38,7 +38,8 @@ export default {
       const linkedBy = String(ctx.fm(meta, "linkedBy") ?? "");
       const automatic = /company-os link|brain koppel/i.test(linkedBy);
       for (const a of [].concat(ctx.fm(meta, "account") ?? [])) {
-        if (!a || a === "internal" || a === "intern" || a === "private" || a === "prive") continue;
+        // Not an account: own dictation, a private matter, or a casual contact the human filed as `none`.
+        if (!a || /^(internal|intern|private|prive|none|geen|casual)$/i.test(String(a))) continue;
         relations.push({ to: a, kind: "belongs-to", source: "frontmatter", confidence: automatic ? "automatic" : "confirmed" });
       }
       for (const label of ctx.config.accountLine) {
