@@ -166,6 +166,8 @@ export async function init(dir, { name = "My company", language = "en", example 
   await put(CONFIG_FILE, JSON.stringify(config, null, 2) + "\n");
   await put("CLAUDE.md", CLAUDE_MD(name));
   await put("README.md", README(name));
+  // The index and the job state are derived; the vault is the canon and the only thing worth committing.
+  await put(".gitignore", ".company-os/\noutputs/\n*.log\n");
   if (example) for (const [rel, text] of Object.entries(EXAMPLE(new Date().toISOString().slice(0, 10)))) await put(rel, text);
 
   return { dir, folders: FOLDERS, written, example };

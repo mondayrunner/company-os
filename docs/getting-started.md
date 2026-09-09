@@ -21,8 +21,10 @@ and each is optional: skip the ones you do not use, or write your own.
 
 ## 2. Make a vault
 
-A vault is a folder of markdown with a config in it. Yours, in git, readable
-without this tool.
+A vault is a folder of markdown with a config in it. Yours, in its own private
+git repo, readable without this tool. Keep it next to the `company-os` clone,
+never inside it: the engine is public and updated with `git pull`, the vault
+holds your clients and is nobody's business.
 
 ```bash
 mkdir acme && cd acme

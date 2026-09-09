@@ -6,6 +6,16 @@ You are reading this because someone pointed you at this repo and asked you to i
 
 A folder of markdown (the vault) that this tool indexes, checks and exposes as MCP tools to you. The vault is theirs, in their git. This repo is the engine and stays a sibling folder. Nothing here calls a model: you do the thinking, the tool answers from their files.
 
+## Two folders, and only one of them is theirs
+
+Keep the engine and the vault apart, always:
+
+- **This repo** (`company-os/`) is the engine. Public, MIT, cloned from GitHub, updated with `git pull`. Nothing of theirs goes in here: no notes, no config, no keys, no connector with their account in it. If they want to change the engine, that is a fork or a pull request, not an edit in place.
+- **The vault** is their own folder, next to it, with its own git repo. Private. Everything about their company lives there: the markdown, `company-os.config.json`, their own connectors and checks, `metrics.csv`, `runs.jsonl` and the inbox. `init` writes a `.gitignore` for the index and the job state, because those are derived. Make the repo private and say so out loud: this folder will hold client names, prices and deal terms, and a key can be rotated but a client file cannot be unpublished.
+- **The example** (`examples/acme` in this repo, or `init --example`) is fictional and for looking at. `init --example` copies it into their vault as a starting point; it never points back into this repo. Delete the Acme files once their own writing is in.
+
+Should the vault be in git at all? Yes. Markdown in git is the whole design: the index can be deleted and rebuilt, the history is the audit trail, and an agent that edits a status file leaves a diff somebody can read. Outside git you lose all three. What stays out of any git is the env files under `~/.config/<tool>/`.
+
 ## The steps
 
 1. **Clone and link.** `git clone https://github.com/mondayrunner/company-os.git`, then `cd company-os && npm link`. If `npm link` is not welcome on this machine, an alias works: `alias company-os="node $PWD/bin/company-os.mjs"`. Needs Node 22.5 or newer, no other dependencies.

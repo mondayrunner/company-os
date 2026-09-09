@@ -11,10 +11,11 @@ async function fresh(opts) {
   return { dir, r, clean: () => rm(dir, { recursive: true, force: true }) };
 }
 
-test("init writes a config, the folders and nothing else", async () => {
+test("init writes a config, the folders, a gitignore for the derived files and nothing else", async () => {
   const { dir, r, clean } = await fresh({ name: "Acme" });
   try {
-    assert.deepEqual(r.written.sort(), ["CLAUDE.md", "README.md", "company-os.config.json"]);
+    assert.deepEqual(r.written.sort(), [".gitignore", "CLAUDE.md", "README.md", "company-os.config.json"]);
+    assert.match(await readFile(join(dir, ".gitignore"), "utf8"), /^\.company-os\/$/m);
     const cfg = JSON.parse(await readFile(join(dir, "company-os.config.json"), "utf8"));
     assert.equal(cfg.name, "Acme");
     assert.equal(cfg.language, "en");
