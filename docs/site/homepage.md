@@ -4,7 +4,7 @@ Written 2026-08-30 with the Napier Holland method: pain first, ability-led headl
 
 ## Nav
 
-company-os · Docs · GitHub · **npm i -g companyos**
+company-os · Docs · **GitHub**
 
 ## Hero
 
@@ -14,7 +14,7 @@ Kicker: Open-source company brain for Claude Code and Cursor
 
 company-os turns a folder of markdown and your live tools into one MCP server. Ask about a client and get the status, who holds the ball and what you promised, in one call. No model inside, no vector database, no dependencies.
 
-[Install in two minutes] [See how it works]
+[Clone it, two minutes] [See how it works]
 MIT · zero dependencies · runs on your laptop
 
 Proof line: Runs one company every day. Measured, not promised: a todo from a mail went from 1 min 47 s to 1.3 s.
@@ -78,13 +78,13 @@ Tim van den Bosch, runs it every day at Sitelane
 
 ## Midway CTA
 
-## Three commands to your first answer.
+## Four commands to your first answer.
 
-    npm i -g companyos
+    git clone https://github.com/mondayrunner/company-os.git && cd company-os && npm link
     company-os init --example
     company-os account harper
 
-[Install in two minutes]
+[Clone it, two minutes]
 
 ## Questions people ask before they trust it
 
@@ -98,7 +98,7 @@ Tim van den Bosch, runs it every day at Sitelane
 
 ## Give your company a memory your agent can use.
 
-[Install in two minutes] [Read the source]
+[Clone it, two minutes] [Read the source]
 MIT · under 4,000 lines · read it in an evening
 
 ## Footer

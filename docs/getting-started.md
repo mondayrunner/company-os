@@ -4,12 +4,20 @@ Ten minutes to a brain that answers questions about your own company.
 
 ## 1. Install
 
+There is no package. Clone the repo and link the command:
+
 ```bash
-npm install -g companyos      # or: npx companyos …
+git clone https://github.com/mondayrunner/company-os.git
+cd company-os
+npm link                      # puts `company-os` on your PATH
 company-os --help
 ```
 
+No `npm link`? `alias company-os="node $PWD/bin/company-os.mjs"` does the same.
 Node 22.5 or newer. No other dependencies: the database is `node:sqlite`.
+
+Steps 1 to 4 need nothing but this folder. Steps 5 and 6 add outside sources,
+and each is optional: skip the ones you do not use, or write your own.
 
 ## 2. Make a vault
 
@@ -63,10 +71,13 @@ Nothing here calls a model. Ask the questions in the agent you already use:
 register the MCP server (`claude mcp add company-os -- company-os serve`) and
 Claude Code or Cursor gets these same answers as tools.
 
-## 5. Connect a source
+## 5. Connect a source (optional)
 
 Numbers that live in another system stay there. A connector reads them when
-asked, and nothing copies them into your markdown.
+asked, and nothing copies them into your markdown. Stripe is the example below
+because it ships; if your money lives elsewhere, [extending.md](extending.md)
+shows the one-file contract a connector has to meet, and the shipped ones in
+`connectors/` are the templates to copy.
 
 ```json
 "connectors": { "stripe": { "envFile": "~/.config/finance/.env" } }
@@ -79,11 +90,16 @@ company-os snapshot     # one row of numbers per day, for the line later
 
 Which sources exist and how to write your own: [extending.md](extending.md).
 
-## 6. Make the boards, pick up a ticket
+## 6. Make the boards, pick up a ticket (optional, Trello)
 
-The base version expects three kinds of board: one for sales, one for your own
-to-do list, and one per client. It makes them itself, so the column names are an
-agreement instead of something you have to remember to type the same way twice.
+Skip this step if your work does not live in Trello: `tasks.md` in the vault
+already gives the brain a task list, and a connector for your own tool takes
+this step's place.
+
+The Trello connector expects three kinds of board: one for sales, one for your
+own to-do list, and one per client. It makes them itself, so the column names
+are an agreement instead of something you have to remember to type the same way
+twice.
 
 ```bash
 company-os boards                   # what exists, what is missing

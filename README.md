@@ -13,7 +13,14 @@ company-os check           # drift: stale pages, dead links, pipeline vs. folder
 company-os serve           # the same answers as MCP tools, for Claude Code or Cursor
 ```
 
-New here? Read [docs/getting-started.md](docs/getting-started.md), ten minutes from install to a brain that answers. Prefer pictures? Open [docs/explained.html](docs/explained.html): nine drawings, few words.
+There is no package to install: clone the repo and link the command.
+
+```bash
+git clone https://github.com/mondayrunner/company-os.git
+cd company-os && npm link      # or: alias company-os="node $PWD/bin/company-os.mjs"
+```
+
+New here? Read [docs/getting-started.md](docs/getting-started.md), ten minutes from clone to a brain that answers. Prefer pictures? Open [docs/explained.html](docs/explained.html): nine drawings, few words.
 
 Your company has a memory that lives in folders. Every morning notes come in: messages, recordings, what happened in the bank. A robot sorts them into the right folder. When you ask something, it looks through the folders and tells you where it found the answer. Every week it checks whether notes have gone stale and asks you: shall I fix this? It never fixes anything on its own. Anything that leaves the building, an email or an invoice, you send by hand.
 
@@ -43,17 +50,19 @@ Every company brain has the same four parts (after *The Ontology of the Company 
 
 One rule follows from this: **figures that live in a system of record (MRR in Stripe, cards in Trello) are never copied into markdown.** The brain reads them live and snapshots a few numbers a day. A copy starts ageing the moment you make it, and `check` flags copies.
 
-## The base version picks the tools
+## Sources are connectors, and yours will differ
 
-A brain that plugs into anything is a brain you have to wire up before it does anything. So the base version chooses: **Trello** for the work, **Paraspeech** for what was said, **Stripe** for what came in. Three sources, three questions a company asks itself every day. The connector contract underneath stays open, so swap any of them or write your own — you just do not have to start there.
+company-os does not know where your work, your conversations or your money live. Every outside source is a connector: one file with one contract (below). The base needs none of them. A folder of markdown, a `tasks.md` and the `status` connector are enough to index, search, check and answer over MCP, and that is where everyone starts.
 
-Trello is the one it also sets up. `company-os boards` reads the boards from your config, says which are missing and creates them when you add `--create`; `company-os boards "Acme" --create` adds one client board from the template. The rest leans on those names: the column where a client's open work lives is found by its name, and a board the brain made carries an agreement instead of a hope.
+Nine connectors ship because we use them: **Trello** for work, **Paraspeech** for recordings, **Stripe** for money, plus `imap`, `ics-calendar`, `metrics-http`, `markdown`, `status` and `tasks-markdown`. Treat them as worked examples. If your work lives in Linear, your recordings in Fireflies and your money in Mollie, you write three files against the same contract and the rest of the brain (checks, inbox, MCP, dashboard) does not change. What the shipped ones do, so you know what to copy:
 
-`company-os ticket <card>` then turns one card into a brief an agent can start on: description, checklists, comments, and the attachments downloaded to disk — a Trello attachment URL is private, so a link nobody can open is not a brief. A card with nothing on it at all comes back `empty` instead of sending an agent off to guess what the job was.
+- `trello`: `company-os boards` reads the boards from your config, says which are missing and creates them with `--create`; `company-os ticket <card>` turns one card into a brief an agent can start on, with description, checklists, comments and the attachments downloaded to disk (a Trello attachment URL is private, so a link nobody can open is not a brief). A card with nothing on it comes back `empty` instead of sending an agent off to guess.
+- `paraspeech`: files recordings of ten minutes or more into the transcript inbox with a proposal for who they were with. `company-os link` attaches the ones it is sure about; the `unfiled-transcripts` check names the ones still waiting, otherwise that folder is the one place where doing nothing looks exactly like being up to date.
+- `stripe`: answers the money questions live, and `subscriptions-vs-accounts` says when a subscription and a folder disagree.
 
-Paraspeech files recordings of ten minutes or more into the transcript inbox with a proposal for who they were with. `company-os link` attaches the ones it is sure about, and the `unfiled-transcripts` check names the ones still waiting — otherwise that folder is the one place where doing nothing looks exactly like being up to date. Stripe answers the money questions live, and `subscriptions-vs-accounts` says when a subscription and a folder disagree. The live sources are never copied, which leaves one gap: the source moved and the folder did not. Four checks close it, all the same shape — something happened, the folder's newest file is older, so it is not written down yet: `mail-vs-accounts` (a mail from or to a known address), `transcripts-vs-accounts` (a recording attached to the account, not in the status file), `calendar-vs-accounts` (a past appointment naming the account) and `board-vs-pipeline` (the sales board and the pipeline file disagree). Process it into the folder and the finding closes itself.
+The live sources are never copied, which leaves one gap: the source moved and the folder did not. Four checks close it, all the same shape (something happened, the folder's newest file is older, so it is not written down yet): `mail-vs-accounts`, `transcripts-vs-accounts`, `calendar-vs-accounts` and `board-vs-pipeline`. Each runs only when its connector is configured. Process the event into the folder and the finding closes itself.
 
-A finding is not a ticket for the human to work off. Where the check can carry the work itself it does: `board-vs-pipeline` with `sync: true` makes the missing cards and reports it; `mail-vs-accounts` and `transcripts-vs-accounts` post a *proposal* that carries the mails or the transcript, so approving it is enough and an agent writes the call into the status file; `calendar-vs-accounts` asks one sentence ("what came out of it?") and files the reply as a dated log line. What is left for the human is the judgement call — alive or lost, lead or casual contact — asked once for the group, not once per item. Every run that did something posts one summary (what was made, what is new, what closed) so the inbox reads as news, not as a ticket queue.
+A finding is not a ticket for the human to work off. Where the check can carry the work itself it does: `board-vs-pipeline` with `sync: true` makes the missing cards and reports it; `mail-vs-accounts` and `transcripts-vs-accounts` post a *proposal* that carries the mails or the transcript, so approving it is enough and an agent writes the call into the status file; `calendar-vs-accounts` asks one sentence ("what came out of it?") and files the reply as a dated log line. What is left for the human is the judgement call, alive or lost, lead or casual contact, asked once for the group, not once per item. Every run that did something posts one summary so the inbox reads as news, not as a ticket queue.
 
 ## Configuration
 
