@@ -259,6 +259,13 @@ export async function runJob(ctx, name) {
   const seconds = Math.round((Date.now() - started) / 1000);
   if (wroteNothing && code !== 0) await writeStatus(ctx, name, { result: "error", done: 0, failed: 1, message: `exit ${code} after ${seconds}s (the job wrote no status)` });
   else if (wroteNothing && !before) await writeStatus(ctx, name, { result: "ok", done: 1, failed: 0, message: `exit 0 after ${seconds}s (the job writes no status of its own)` });
+  // Started from a terminal, say how it went: most jobs talk to their log and
+  // a tab that ends in silence looks like a tab where nothing happened.
+  if (process.stdout.isTTY) {
+    const st = normalizeStatus(JSON.parse(await readFile(statusFile, "utf8").catch(() => "{}")), name);
+    const line = st ? `${st.result} · ${st.message || `${st.done} done, ${st.failed} failed`}` : `exit ${code}`;
+    process.stdout.write(`${name}: ${line} (${seconds}s, log: ${job.log})\n`);
+  }
   return code;
 }
 
