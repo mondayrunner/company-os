@@ -75,6 +75,18 @@ test("edit-markdown with appendReply files the reply as a dated log line, and ne
   assert.match(readFileSync(join(root, file), "utf8"), /## Log\n\n- 2026-09-05 — Kickoff Acme: scope agreed, they send the copy by Friday/);
 });
 
+test("appendReply creates the status file when the dossier never had one", async () => {
+  const file = "accounts/leads/2026-01-15-acme-website/00-STATUS.md";
+  const { id } = await postItem(ctx, { kind: "question", from: "check", title: "WhatsApp with Acme: last message 2026-09-14, newer than anything in the folder", body: "…",
+    action: { type: "edit-markdown", inward: true, file, appendReply: true, under: "Log", prefix: "- 2026-09-14 — WhatsApp Acme: " } });
+  await reply(ctx, id, "new course date, they want it on the site", { status: "approved" });
+  const r = await runApproved(ctx, { only: id });
+  assert.ok(r[0].ok, r[0].message); assert.match(r[0].message, /created/);
+  const text = readFileSync(join(root, file), "utf8");
+  assert.match(text, /^# STATUS — 2026-01-15-acme-website\n/);
+  assert.match(text, /## Log\n\n- 2026-09-14 — WhatsApp Acme: new course date, they want it on the site/);
+});
+
 test("a check-vouched (inward) action passes the word filter; a question without a reply is not run", async () => {
   const { id } = await postItem(ctx, { kind: "proposal", from: "check", title: "2 mails newer than the folder", body: "…", action: { type: "edit-markdown", inward: true, file: "knowledge/pricing.md", append: "- read the mail, nothing changed" } });
   await reply(ctx, id, "", { status: "approved" });

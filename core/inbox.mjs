@@ -185,7 +185,15 @@ async function applyAction(ctx, item) {
   switch (a.type) {
     case "edit-markdown": {
       const file = inside(ctx, a.file);
-      let text = await readFile(file, "utf8").catch((e) => { if (e.code === "ENOENT" && a.create) return ""; throw e; });
+      // A log line aimed at a status file that does not exist yet (a dossier
+      // that never got its status file) used to fail with ENOENT after the
+      // human had already approved. The file is inside the root and the line
+      // is the human's own words, so create it, with a heading that names the
+      // dossier so the file is not a bare "## Log".
+      const mayCreate = a.create || a.appendReply;
+      let text = await readFile(file, "utf8").catch((e) => { if (e.code === "ENOENT" && mayCreate) return null; throw e; });
+      const created = text === null;
+      if (created) text = a.appendReply ? `# STATUS — ${basename(dirname(file))}\n` : "";
       for (const r of a.replace ?? []) {
         if (!text.includes(r.from)) return { ok: false, message: `text to replace not found in ${a.file}: ${r.from.slice(0, 60)}` };
         text = text.replace(r.from, r.to);
@@ -199,9 +207,9 @@ async function applyAction(ctx, item) {
         if (!line) return { ok: false, message: "no reply: reply with the line to write and approve" };
         text = appendUnder(text, a.under ?? "Log", `${a.prefix ?? `- ${new Date().toISOString().slice(0, 10)} — `}${line}`);
       }
-      if (a.create) await mkdir(dirname(file), { recursive: true });
+      if (created) await mkdir(dirname(file), { recursive: true });
       await writeFile(file, text);
-      return { ok: true, message: `edited ${a.file}` };
+      return { ok: true, message: `${created ? "created" : "edited"} ${a.file}` };
     }
     case "set-frontmatter": {
       const file = inside(ctx, a.file);
