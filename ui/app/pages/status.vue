@@ -19,10 +19,14 @@ const stateTone: Record<string, string> = { ok: "bg-success", partial: "bg-orang
 
 // Fire a job now. Same thing as `company-os jobs run <name>` in a terminal;
 // the button exists so a Friday job can be tried on a Tuesday.
+//
+// force: a job may skip itself when today's work is already done (a daily
+// plan does). Pressing ▶ by hand means "do it again", so say so — without it
+// the button reports a run that ended before you could look at it.
 async function run(name: string) {
   working.value = name; note.value = null
   try {
-    const r: any = await $fetch("/api/kickstart", { method: "POST", body: { name } })
+    const r: any = await $fetch("/api/kickstart", { method: "POST", body: { name, force: true } })
     note.value = { name, ok: !!r?.ok, text: r?.ok ? (r.opened === "herdr" ? (r.busy ? "already running in herdr" : "runs in herdr") : "started") : r?.error || "failed" }
     setTimeout(() => refreshSys(), 4000)
   } catch (e: any) { note.value = { name, ok: false, text: e?.data?.error || "failed" } }

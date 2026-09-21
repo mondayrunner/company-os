@@ -149,12 +149,15 @@ try {
     }
     case "serve": await serve(ctx, db); break;
     case "jobs": {
-      // company-os jobs list | install [--target launchd|cron|systemd] [name] [--dry-run] [--force] | uninstall [name] | run <name>
+      // company-os jobs list | install [--target launchd|cron|systemd] [name] [--dry-run] [--force] | uninstall [name] | run <name> [--force]
       const [sub, name] = rest;
       if (sub === "list" || !sub) out(await listJobs(ctx));
       else if (sub === "install") out(await install(ctx, { target: flags.target, only: name ?? null, dryRun: !!flags["dry-run"], force: !!flags.force }));
       else if (sub === "uninstall") out(await uninstall(ctx, { target: flags.target, only: name ?? null }));
-      else if (sub === "run") { db.close(); process.exit(await runJob(ctx, name)); }
+      // --force on a run says "I am asking, not the schedule": a job that
+      // skips itself when today's work is done runs anyway. Same word the
+      // dashboard's ▶ sends, so terminal and button do the same thing.
+      else if (sub === "run") { db.close(); process.exit(await runJob(ctx, name, { force: !!flags.force })); }
       else { console.error("jobs: list | install | uninstall | run <name>"); process.exit(1); }
       break;
     }
@@ -185,7 +188,7 @@ function help() {
   boards [client name] [--create]   the boards this brain expects; shows the plan, --create makes what is missing
   inbox list|post|reply|approve|reject|show|run   agents talk back here; approved items get executed
   serve                      MCP server over stdio for agents
-  jobs list|install|uninstall|run <name>   schedule the config's jobs on launchd, cron or systemd
+  jobs list|install|uninstall|run <name> [--force]   schedule the config's jobs on launchd, cron or systemd; --force runs a job that would skip itself
   status                     what is in the brain
   import-legacy <db>         copy history from a pre-company-os database
   init [--name "..."] [--language xx] [--example]   config, folders and optionally a demo company

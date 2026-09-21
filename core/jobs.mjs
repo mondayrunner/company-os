@@ -232,7 +232,7 @@ export async function rotateLog(file, max = 2 * 1024 * 1024) {
  * without touching its status is skipping on purpose (the daily plan already
  * exists, say), and overwriting that would erase the morning's real result.
  */
-export async function runJob(ctx, name) {
+export async function runJob(ctx, name, { force = false } = {}) {
   const job = jobsOf(ctx).find((j) => j.name === name);
   if (!job) throw new Error(`no job named ${name}`);
   await mkdir(dirname(job.log), { recursive: true });
@@ -245,7 +245,10 @@ export async function runJob(ctx, name) {
   const out = createWriteStream(job.log, { flags: "a" });
   out.write(`\n===== ${new Date().toISOString()} ${name} =====\n`);
   const code = await new Promise((resolve) => {
-    const p = spawn("/bin/bash", ["-lc", job.run], { cwd: ctx.root, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, COMPANY_OS_ROOT: ctx.root, PATH: `${pathFor(ctx)}:${process.env.PATH ?? ""}`, ...(job.env ?? {}) } });
+    // force is the one word for "a human asked for this run, do it again": a
+    // job that skips itself when today's work is already done reads
+    // COMPANY_OS_FORCE. The job still decides whether it has a reason to skip.
+    const p = spawn("/bin/bash", ["-lc", job.run], { cwd: ctx.root, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, COMPANY_OS_ROOT: ctx.root, PATH: `${pathFor(ctx)}:${process.env.PATH ?? ""}`, ...(job.env ?? {}), ...(force ? { COMPANY_OS_FORCE: "1" } : {}) } });
     for (const stream of [p.stdout, p.stderr]) {
       stream.pipe(out, { end: false });
       if (process.stdout.isTTY) stream.pipe(process.stdout, { end: false });

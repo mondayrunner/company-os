@@ -147,7 +147,7 @@ Every finding becomes one inbox item, fingerprinted, so the same finding never l
 "jobs": [{ "name": "invoices", "title": "Chase open invoices", "run": "company-os check --only invoices-vs-accounts", "cron": "0 9 * * 1" }]
 ```
 
-`company-os jobs install` writes launchd plists, a crontab block or systemd timers, whichever the machine takes. Every job writes the same status file, rotates its own log and adds a row to the event history. `company-os jobs run <name>` runs one by hand.
+`company-os jobs install` writes launchd plists, a crontab block or systemd timers, whichever the machine takes. Every job writes the same status file, rotates its own log and adds a row to the event history. `company-os jobs run <name>` runs one by hand, and `--force` sets `COMPANY_OS_FORCE=1` in the job's environment: a job that skips itself when today's work is already done (a daily plan does) reads that as "a human is asking, do it again". The dashboard's ▶ sends the same thing.
 
 ## What not to build
 
