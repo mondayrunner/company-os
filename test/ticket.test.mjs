@@ -52,6 +52,13 @@ test("brief: a title and a file are a brief, and the file is named by its path",
   assert.ok(brief.includes("shot.png — on disk: /state/shot.png"));
 });
 
+test("brief: a title alone is a brief, with the look-first rule", () => {
+  const { brief, hasText } = briefText(card({}));
+  assert.equal(hasText, false);
+  assert.ok(brief.includes("This card is only a title"));
+  assert.ok(!brief.includes("This card has no description"));
+});
+
 test("brief: a card with text does not get the attachment rule", () => {
   const { brief } = briefText(card({ desc: "fix it", attachments: [{ name: "a.png", url: "u", path: "/p/a.png" }] }));
   assert.ok(!brief.includes("This card has no description"));
