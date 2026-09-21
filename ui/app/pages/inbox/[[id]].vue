@@ -67,7 +67,13 @@ async function act(action: string, id?: string, text?: string) {
     const r: any = await $fetch("/api/inbox", { method: "POST", body: { action, id, text } })
     if (!r?.ok) note.value = r?.error ?? "failed"
     if (id) reply[id] = ""
-    if (action === "approve" && r?.ok) await $fetch("/api/inbox", { method: "POST", body: { action: "run", id } }).catch(() => null)
+    // A refused run answers ok:false, it does not throw: a run already going
+    // is the common one. Swallowing that left the item approved and unrun,
+    // with the page reporting success.
+    if (action === "approve" && r?.ok) {
+      const run: any = await $fetch("/api/inbox", { method: "POST", body: { action: "run", id } }).catch((e: any) => ({ ok: false, error: e?.data?.error || e?.message }))
+      if (!run?.ok) note.value = run?.error ?? "approved, but the run did not start"
+    }
     await refresh()
   } catch (e: any) { note.value = e?.data?.error || e?.message || "failed" }
   finally { working.value = null }
@@ -84,9 +90,20 @@ onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
 async function bulk(action: "approve" | "reject") {
   const ids = actionable.value.map((i: any) => i.id)
   working.value = "bulk"
+  note.value = null
   try {
-    for (const id of ids) await $fetch("/api/inbox", { method: "POST", body: { action, id, text: reply[id] } })
-    if (action === "approve" && ids.length) await $fetch("/api/inbox", { method: "POST", body: { action: "run" } }).catch(() => null)
+    // One failing item used to throw out of the loop: the rest was never
+    // approved, the selection stayed, and nothing said so. Keep going and
+    // report instead.
+    let failed = 0
+    for (const id of ids) {
+      const r: any = await $fetch("/api/inbox", { method: "POST", body: { action, id, text: reply[id] } }).catch((e: any) => ({ ok: false, error: e?.data?.error || e?.message }))
+      if (!r?.ok) { failed++; note.value = r?.error ?? `${action} failed on one item` }
+    }
+    if (action === "approve" && ids.length > failed) {
+      const run: any = await $fetch("/api/inbox", { method: "POST", body: { action: "run" } }).catch((e: any) => ({ ok: false, error: e?.data?.error || e?.message }))
+      if (!run?.ok) note.value = run?.error ?? "approved, but the run did not start"
+    }
     checked.value = new Set()
     await refresh()
   } finally { working.value = null }
