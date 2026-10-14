@@ -16,7 +16,7 @@
  * Writing, reversible and logged
  *   todo "title" [--due d]    a card on the task board
  *   task-done <id>            move a card to done
- *   draft --to --title --file a draft in the mail client, never sent
+ *   draft --to --title --file [--cc a] [--attach f]…  a draft in the mail client, never sent
  *
  * Keeping it honest
  *   boards [--create]         the boards this brain expects, made if you ask
@@ -61,7 +61,8 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a.startsWith("--")) {
     const k = a.slice(2);
-    if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id", "target", "side", "section", "uid", "limit", "mailbox", "board", "to", "due", "list", "body", "repo", "who", "client", "job"].includes(k)) flags[k] = argv[++i];
+    if (k === "attach") (flags.attach ??= []).push(argv[++i]);
+    else if (["root", "only", "language", "name", "kind", "from", "title", "file", "action", "status", "id", "target", "side", "section", "uid", "limit", "mailbox", "board", "to", "cc", "due", "list", "body", "repo", "who", "client", "job"].includes(k)) flags[k] = argv[++i];
     else flags[k] = true;
   } else positional.push(a);
 }
@@ -98,7 +99,7 @@ try {
     case "calendar": out(await calendar(ctx, { from: flags.from ?? null, to: flags.to ?? null })); break;
     case "todo": out(await todo(ctx, { title: rest.join(" "), body: flags.body ?? "", due: flags.due ?? null, list: flags.list ?? null })); break;
     case "task-done": out(await taskDone(ctx, { id: rest[0], list: flags.list ?? null })); break;
-    case "draft": out(await mailDraft(ctx, { to: flags.to, subject: flags.title, body: flags.file ? readFileSync(flags.file, "utf8") : rest.join(" ") })); break;
+    case "draft": out(await mailDraft(ctx, { to: flags.to, cc: flags.cc, subject: flags.title, body: flags.file ? readFileSync(flags.file, "utf8") : rest.join(" "), attachments: flags.attach })); break;
     case "ticket": {
       // The brief is text on purpose: pipe it into an agent, or read it yourself.
       // More than one id is one brief for one agent, not one brief each.
@@ -184,7 +185,7 @@ function help() {
   finance | tasks | calendar [--from d --to d]   live sources, answer-shaped
   todo "title" [--body ..] [--due d] [--list l]   a card on the task board (reversible, logged)
   task-done <id> [--list l]  move a card to done (reversible, logged)
-  draft --to a --title s --file body.txt   a draft in the mail client (never sends)
+  draft --to a --title s --file body.txt [--cc a] [--attach f.pdf …]   a draft in the mail client (never sends)
   boards [client name] [--create]   the boards this brain expects; shows the plan, --create makes what is missing
   inbox list|post|reply|approve|reject|show|run   agents talk back here; approved items get executed
   serve                      MCP server over stdio for agents

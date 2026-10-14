@@ -15,10 +15,12 @@
  * live({ what: "since", days: 30, limit: 300 })  → { found, items: [{ uid, subject, from, address, to, date }] }  headers only
  * live({ what: "search", query, limit: 5 })     → { items: [{ uid, subject, from, address, to, date, body, attachments }] }
  * live({ what: "read", uid })                   → { item }
- * act("draft", { to, subject, body })           → { mailbox, subject, to, replaced }
+ * act("draft", { to, cc?, subject, body, attachments? })  → { mailbox, subject, to, replaced, chars, attached }  attachments = file paths
  */
 import { connect as tcp } from "node:net";
 import { connect as tls } from "node:tls";
+import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { secret } from "../core/env.mjs";
 
 const BODY_CHARS = 6000;
@@ -231,8 +233,10 @@ export default {
    */
   async act(action, params, ctx, options) {
     if (action !== "draft") throw new Error(`imap: unknown action "${action}"`);
-    const { to, subject, body } = params ?? {};
+    const { to, cc, subject, body, attachments = [] } = params ?? {};
     if (!to || !subject || !body) throw new Error("imap: draft needs to, subject and body");
+    // Read the files before touching the mailbox: a bad path must fail before the old draft is gone.
+    const files = attachments.map((path) => ({ name: encodeWord(basename(path)), type: /\.pdf$/i.test(path) ? "application/pdf" : "application/octet-stream", data: readFileSync(path) }));
     const { imap, user } = await open(options);
     const mailbox = options?.drafts ?? "Drafts";
     try {
@@ -242,13 +246,16 @@ export default {
       const uids = (old.match(/\* SEARCH([^\r\n]*)/)?.[1] ?? "").trim().split(/\s+/).filter(Boolean);
       if (uids.length) { await imap.cmd(`UID STORE ${uids.join(",")} +FLAGS (\\Deleted)`); await imap.cmd("EXPUNGE"); replaced = uids.length; }
       const from = options?.from ?? user;
-      const msg = [
-        `From: ${from}`, `To: ${to}`, `Subject: ${encodeWord(subject)}`, `Date: ${new Date().toUTCString()}`,
-        "MIME-Version: 1.0", "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "",
-        Buffer.from(toHtml(body), "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n"),
-      ].join("\r\n");
-      await imap.literal(`APPEND ${quote(mailbox)} (\\Draft)`, msg);
-      return { mailbox, to, subject, replaced, chars: body.length };
+      const part = (headers, buf) => [...headers, "", buf.toString("base64").replace(/(.{76})/g, "$1\r\n")];
+      const head = [`From: ${from}`, `To: ${to}`, ...(cc ? [`Cc: ${cc}`] : []), `Subject: ${encodeWord(subject)}`, `Date: ${new Date().toUTCString()}`, "MIME-Version: 1.0"];
+      const text = part(["Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64"], Buffer.from(toHtml(body), "utf8"));
+      const boundary = `=_co_${Date.now().toString(36)}`;
+      const parts = [text, ...files.map((f) => part([`Content-Type: ${f.type}; name="${f.name}"`, "Content-Transfer-Encoding: base64", `Content-Disposition: attachment; filename="${f.name}"`], f.data))];
+      const msg = files.length
+        ? [...head, `Content-Type: multipart/mixed; boundary="${boundary}"`, "", ...parts.flatMap((p) => [`--${boundary}`, ...p]), `--${boundary}--`]
+        : [...head, ...text];
+      await imap.literal(`APPEND ${quote(mailbox)} (\\Draft)`, msg.join("\r\n"));
+      return { mailbox, to, subject, replaced, chars: body.length, attached: files.length };
     } finally { imap.cmd("LOGOUT").catch(() => {}); imap.end(); }
   },
   async scan(ctx, options) {

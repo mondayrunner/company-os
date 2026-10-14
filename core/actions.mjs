@@ -42,10 +42,12 @@ export async function taskDone(ctx, { id, list = null } = {}) {
 }
 
 /** A draft in the mail client's Drafts folder. The body is the agent's; this only files it. */
-export async function mailDraft(ctx, { to, subject, body } = {}) {
+export async function mailDraft(ctx, { to, cc, subject, body, attachments } = {}) {
   if (!to || !subject || !body) throw new Error("mailDraft needs to, subject and body");
-  return traced(ctx, "mail draft", `to ${to} · ${subject}`.slice(0, 200), async () => {
-    const { connector, result } = await doAct(ctx, "mail", "draft", { to, subject, body });
+  const files = [].concat(attachments ?? []).filter(Boolean);
+  const extra = [cc && `cc ${cc}`, files.length && `${files.length} attached`].filter(Boolean).join(" · ");
+  return traced(ctx, "mail draft", `to ${to} · ${subject}${extra && ` · ${extra}`}`.slice(0, 200), async () => {
+    const { connector, result } = await doAct(ctx, "mail", "draft", { to, cc, subject, body, attachments: files });
     return { draft: result, source: connector };
   });
 }
