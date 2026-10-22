@@ -9,13 +9,33 @@
  *
  *   "imap": { "envFile": "~/.config/mail/.env", "host": "127.0.0.1", "port": 1143,
  *             "secure": false, "userName": "BRIDGE_USER", "passName": "BRIDGE_PASS",
- *             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>" }
+ *             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>",
+ *             "timeoutMs": 20000 }
+ *
+ * `timeoutMs` (default 20 s) bounds the connect and every command: a Bridge
+ * that is not running fails at once (ECONNREFUSED), one that hangs fails with
+ * code ETIMEDOUT instead of holding a scheduled job open.
  *
  * live({ what: "unread", limit: 40 })           → { unread, items: [{ uid, subject, from, address, date }] }
- * live({ what: "since", days: 30, limit: 300 })  → { found, items: [{ uid, subject, from, address, to, date }] }  headers only
+ * live({ what: "since", days: 30, limit: 300 })  → { found, items: [{ uid, subject, from, address, to, cc, date }] }  headers only
  * live({ what: "search", query, limit: 5 })     → { items: [{ uid, subject, from, address, to, date, body, attachments }] }
  * live({ what: "read", uid })                   → { item }
+ * live({ what: "capabilities" })                → { capabilities, trash: "move" | "copy+expunge" | null }  what trashDraft would use
  * act("draft", { to, cc?, subject, body, attachments? })  → { mailbox, subject, to, replaced, chars, attached }  attachments = file paths
+ * act("trashDraft", { uid, mailbox?, expect: { subject, to, date } })  → { mailbox, trash, uid, subject, to, date, via }
+ *
+ * trashDraft is the second write, named apart from draft on purpose: it
+ * moves ONE message out of the Drafts mailbox into Trash, where the mail
+ * client can restore it. Guards, all in this file:
+ *   - the mailbox must be the configured Drafts mailbox (`drafts`, default
+ *     "Drafts"); any other name is refused before connecting (draftsOnly);
+ *   - the message under that UID must still have the subject, To and Date the
+ *     caller saw (`expect`), or nothing happens;
+ *   - UID MOVE when the server has MOVE; otherwise UID COPY to Trash, flag
+ *     \Deleted and UID EXPUNGE of that one UID (needs UIDPLUS). Without either,
+ *     it refuses: a plain EXPUNGE could take other flagged drafts with it.
+ * Trash is `trash` in the options, default "Trash". Nothing is ever expunged
+ * from Trash.
  */
 import { connect as tcp } from "node:net";
 import { connect as tls } from "node:tls";
@@ -26,7 +46,15 @@ import { secret } from "../core/env.mjs";
 const BODY_CHARS = 6000;
 
 class Imap {
-  constructor(socket) { this.s = socket; this.n = 0; this.buf = ""; this.waiters = []; socket.on("data", (d) => this.onData(d.toString("binary"))); }
+  constructor(socket) {
+    this.s = socket; this.n = 0; this.buf = ""; this.waiters = [];
+    socket.on("data", (d) => this.onData(d.toString("binary")));
+    // A socket that dies or times out must fail the command waiting on it,
+    // not leave the promise (and the job) hanging.
+    const fail = (e) => { for (const w of this.waiters.splice(0)) w.reject(e); };
+    socket.on("error", fail);
+    socket.on("close", () => fail(Object.assign(new Error("imap: connection closed"), { code: "ECONNRESET" })));
+  }
   onData(chunk) {
     this.buf += chunk;
     const w = this.waiters[0];
@@ -139,13 +167,16 @@ function itemOf(uid, raw) {
   const { from, address } = fromParts(h.from);
   const { text, html, attachments } = bodyText(raw);
   const body = (text || stripHtml(html)).replace(/\r/g, "").trim();
-  return { uid, subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, date: h.date ? new Date(h.date).toISOString() : null,
+  return { uid, subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, cc: h.cc ?? null, date: h.date ? new Date(h.date).toISOString() : null,
     body: body.length > BODY_CHARS ? body.slice(0, BODY_CHARS) + "\n…" : body, truncated: body.length > BODY_CHARS, attachments };
 }
+
+const timeoutError = () => Object.assign(new Error("imap: timed out"), { code: "ETIMEDOUT" });
 
 async function open(options) {
   const host = options?.host ?? "127.0.0.1", port = options?.port ?? 1143;
   const socket = options?.secure ? tls({ host, port, rejectUnauthorized: options?.rejectUnauthorized ?? false }) : tcp({ host, port });
+  socket.setTimeout(options?.timeoutMs ?? 20000, () => socket.destroy(timeoutError()));
   await new Promise((res, rej) => { socket.once(options?.secure ? "secureConnect" : "connect", res); socket.once("error", rej); });
   const imap = new Imap(socket);
   await imap.greeting();
@@ -165,11 +196,11 @@ const uidsOf = (search) => (search.match(/\* SEARCH([^\r\n]*)/)?.[1] ?? "").trim
 async function fetchHeaders(imap, uids) {
   const items = [];
   if (!uids.length) return items;
-  const res = await imap.cmd(`UID FETCH ${uids.join(",")} (UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])`);
+  const res = await imap.cmd(`UID FETCH ${uids.join(",")} (UID BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE)])`);
   for (const m of res.matchAll(/\* \d+ FETCH \(UID (\d+) BODY\[HEADER\.FIELDS \([^)]*\)\] \{(\d+)\}\r?\n([\s\S]*?)\r?\n\)/g)) {
     const h = parseHeaders(m[3]);
     const { from, address } = fromParts(h.from);
-    items.push({ uid: Number(m[1]), subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, date: h.date ? new Date(h.date).toISOString() : null });
+    items.push({ uid: Number(m[1]), subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, cc: h.cc ?? null, date: h.date ? new Date(h.date).toISOString() : null });
   }
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;
@@ -181,10 +212,57 @@ async function fetchOne(imap, uid) {
   return raw == null ? null : itemOf(uid, raw);
 }
 
+/**
+ * The one mailbox trashDraft may touch. Throws unless `mailbox` (when given)
+ * is exactly the configured Drafts mailbox, and that mailbox is not one of the
+ * mailboxes a mistake would hurt most (INBOX, Sent, Trash itself).
+ */
+export function draftsOnly(mailbox, options) {
+  const drafts = options?.drafts ?? "Drafts";
+  const trash = options?.trash ?? "Trash";
+  const box = mailbox === undefined ? drafts : mailbox;
+  if (typeof box !== "string" || box !== drafts) throw new Error(`imap: trashDraft refused: only the Drafts mailbox ("${drafts}") may be cleaned, not "${box}"`);
+  if (/^(inbox|sent( (mail|items|messages))?|trash|bin|archive|all mail|spam|junk)$/i.test(drafts) || drafts === trash) throw new Error(`imap: trashDraft refused: "${drafts}" is not a drafts mailbox`);
+  return { drafts, trash };
+}
+
+/** The commands that move one UID to Trash, given the server's capabilities. */
+export function trashCommands(capabilities, uid, trash) {
+  const caps = String(capabilities ?? "").toUpperCase().split(/\s+/);
+  if (!Number.isInteger(uid) || uid <= 0) throw new Error("imap: trashDraft needs one positive uid");
+  if (caps.includes("MOVE")) return { via: "move", commands: [`UID MOVE ${uid} ${quote(trash)}`] };
+  if (caps.includes("UIDPLUS")) return { via: "copy+expunge", commands: [`UID COPY ${uid} ${quote(trash)}`, `UID STORE ${uid} +FLAGS.SILENT (\\Deleted)`, `UID EXPUNGE ${uid}`] };
+  throw new Error("imap: trashDraft refused: the server has neither MOVE nor UIDPLUS, and a plain EXPUNGE could remove other drafts");
+}
+
+/** Does the message the server has under that UID still match what the caller saw? */
+export function sameDraft(item, expect) {
+  if (!item || !expect) return false;
+  const norm = (v) => String(v ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+  return norm(item.subject) === norm(expect.subject) && norm(item.to) === norm(expect.to) && (item.date ?? null) === (expect.date ?? null);
+}
+
 /** Plain text → the HTML mail clients expect: one div per line, blank lines kept. */
 export function toHtml(text) {
   const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `<div>${text.replace(/\r/g, "").split("\n").map((l) => (l.trim() ? `<div>${esc(l)}</div>` : "<div><br></div>")).join("")}</div>`;
+}
+
+async function trashDraft(params, options) {
+  const { drafts, trash } = draftsOnly(params?.mailbox, options);
+  const uid = Number(params?.uid);
+  if (!params?.expect) throw new Error("imap: trashDraft needs expect { subject, to, date }");
+  trashCommands("MOVE", uid, trash); // validates the uid before connecting
+  const { imap } = await open(options);
+  try {
+    const caps = (await imap.cmd("CAPABILITY")).match(/\* CAPABILITY ([^\r\n]*)/)?.[1] ?? "";
+    const plan = trashCommands(caps, uid, trash);
+    await imap.cmd(`SELECT ${quote(drafts)}`);
+    const [item] = await fetchHeaders(imap, [uid]);
+    if (!sameDraft(item, params.expect)) throw new Error(`imap: trashDraft refused: uid ${uid} in ${drafts} is no longer the draft that was matched`);
+    for (const c of plan.commands) await imap.cmd(c);
+    return { mailbox: drafts, trash, uid, subject: item.subject, to: item.to, date: item.date, via: plan.via };
+  } finally { imap.cmd("LOGOUT").catch(() => {}); imap.end(); }
 }
 
 export default {
@@ -212,6 +290,11 @@ export default {
         const items = await fetchHeaders(imap, uids.slice(0, query.limit ?? 300));
         return { found: uids.length, items, fetched: new Date().toISOString() };
       }
+      if (what === "capabilities") {
+        const capabilities = (await imap.cmd("CAPABILITY")).match(/\* CAPABILITY ([^\r\n]*)/)?.[1] ?? "";
+        let trash = null; try { trash = trashCommands(capabilities, 1, "Trash").via; } catch {}
+        return { capabilities, trash, fetched: new Date().toISOString() };
+      }
       if (what === "read") {
         if (!query.uid) throw new Error("imap: read needs a uid");
         return { item: await fetchOne(imap, Number(query.uid)), fetched: new Date().toISOString() };
@@ -232,6 +315,7 @@ export default {
    * here and will not be.
    */
   async act(action, params, ctx, options) {
+    if (action === "trashDraft") return trashDraft(params, options);
     if (action !== "draft") throw new Error(`imap: unknown action "${action}"`);
     const { to, cc, subject, body, attachments = [] } = params ?? {};
     if (!to || !subject || !body) throw new Error("imap: draft needs to, subject and body");

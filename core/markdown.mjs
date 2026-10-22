@@ -109,3 +109,30 @@ export function tableUnder(text, headingRe, keys) {
 export const hashOf = (s) => createHash("sha1").update(s).digest("hex").slice(0, 16);
 
 export const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/**
+ * The labels a status file may use for its "ball" line: `accounts.ballLine`
+ * plus any spellings in `accounts.ballLines` (a brain that grew both
+ * "**Bal bij:** Sam" and "**Bal:** bij Sam" lists both).
+ */
+export function ballLabels(accounts) {
+  return [...new Set([accounts?.ballLine, ...(accounts?.ballLines ?? [])].filter(Boolean))];
+}
+
+/**
+ * The first line that starts with one of the ball labels: the raw line, its
+ * index, the label it used and the holder text after it ("Sam, versturen…"),
+ * with a leading "bij"/"with" dropped. Null when the file has none.
+ */
+export function findBallLine(text, accounts) {
+  const labels = ballLabels(accounts);
+  const lines = String(text ?? "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim().replace(/^[-*]\s+(?=\*\*)/, "");
+    const label = labels.find((l) => t.startsWith(l));
+    if (!label) continue;
+    const holder = t.slice(label.length).replace(/^[:\s]+/, "").replace(/^(bij|with)\s+/i, "").trim();
+    return { index: i, line: lines[i], label, holder };
+  }
+  return null;
+}

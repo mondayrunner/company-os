@@ -20,7 +20,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadConnectors, byKind, readLive } from "./connectors.mjs";
 import { clean, slug, tableUnder, hashOf } from "./markdown.mjs";
 import { writeStatus } from "./status.mjs";
-import { postItem, resolveStale, expireReports } from "./inbox.mjs";
+import { postItem, resolveStale, expireReports, reply, runApproved } from "./inbox.mjs";
+import { findBallLine } from "./markdown.mjs";
 
 const BUILTIN = join(dirname(fileURLToPath(import.meta.url)), "..", "checks");
 
@@ -145,7 +146,7 @@ export function makeHelpers(ctx, db, connectors) {
 }
 
 /** `job` names the status file: a scheduled subset (`--only mail-vs-accounts --job mail-check`) must not overwrite the weekly run's status. */
-export async function runChecks(ctx, db, { live = true, only = null, job = "check" } = {}) {
+export async function runChecks(ctx, db, { live = true, only = null, job = "check", quiet = false } = {}) {
   const connectors = live ? await loadConnectors(ctx) : [];
   const checks = await loadChecks(ctx, only);
   const h = makeHelpers(ctx, db, connectors);
@@ -158,22 +159,34 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
       const options = ctx.config.checks?.[c.name];
       for (const f of (await c.run(ctx, h, options && typeof options === "object" ? options : {})) ?? []) {
         if (f.text && h.suppressed(f.text)) continue;
-        findings.push({ check: c.name, severity: f.severity ?? "warn", where: f.where, line: f.line ?? null, what: f.what, action: f.action ?? null, kind: f.kind ?? "drift", hint: f.hint ?? null });
+        findings.push({ check: c.name, severity: f.severity ?? "warn", where: f.where, line: f.line ?? null, what: f.what, action: f.action ?? null, kind: f.kind ?? "drift", hint: f.hint ?? null, auto: f.auto ?? null });
       }
-    } catch (e) { findings.push({ check: c.name, severity: "error", where: c.name, what: `check crashed: ${e.message}` }); }
+    } catch (e) {
+      // A check that throws `{ skip: true }` could not look (the mail server is
+      // not running, say). That is not a finding and not a crash: it is skipped,
+      // so its open items stay open instead of closing "on their own".
+      if (e?.skip) { skipped.push({ check: c.name, reason: e.message }); continue; }
+      findings.push({ check: c.name, severity: "error", where: c.name, what: `check crashed: ${e.message}` });
+    }
   }
   const rank = { error: 0, warn: 1, info: 2 };
   findings.sort((a, b) => ((rank[a.severity] ?? 1) - (rank[b.severity] ?? 1)) || a.where.localeCompare(b.where));
   const errors = findings.filter((f) => f.severity === "error").length;
   const date = new Date().toISOString().slice(0, 10);
-  const report = renderReport(ctx, { date, checks, findings, skipped, errors });
-  await mkdir(ctx.outputs, { recursive: true });
-  const file = join(ctx.outputs, `check-${date}.md`);
-  await writeFile(file, report);
+  // `quiet`: a frequent poll (every 15 minutes) writes no report file and no
+  // run summary; it would bury the daily ones. Its findings still go to the inbox.
+  let file = null;
+  if (!quiet) {
+    const report = renderReport(ctx, { date, checks, findings, skipped, errors });
+    await mkdir(ctx.outputs, { recursive: true });
+    file = join(ctx.outputs, `check-${date}.md`);
+    await writeFile(file, report);
+  }
   // Every finding becomes an inbox item once: same finding next week → same fingerprint → no new item.
   // And a finding that stopped appearing closes its own item.
   let posted = 0;
   let closed = [];
+  let autoApplied = [];
   if (ctx.config.inbox?.fromChecks !== false) {
     // One fingerprint per finding: the same value decides whether an old item
     // closes and whether a new one is posted.
@@ -181,7 +194,7 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
     const ran = new Set(checks.filter((c) => !skipped.some((s) => s.check === c.name)).map((c) => c.name));
     closed = await resolveStale(ctx, "check", stamped.map((f) => f.fingerprint), { within: (item, text) => [...ran].some((name) => text.includes(`check \`${name}\``)) });
     closed = closed.concat(await expireReports(ctx));
-    const news = [], fresh = [], refreshed = [];
+    const news = [], fresh = [], refreshed = [], auto = [];
     for (const f of stamped) {
       // A finding says what it is (drift by default), and can say what approving
       // does: a proposal carries an action, a question waits for a reply. Both
@@ -192,20 +205,34 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
       const r = await postItem(ctx, { kind: f.kind, from: "check", title: f.what.replace(/\n/g, " ").slice(0, 120), where: `${f.where}${f.line ? `:${f.line}` : ""}`, fingerprint: f.fingerprint,
         body: `**${f.severity}** · check \`${f.check}\` · \`${f.where}${f.line ? `:${f.line}` : ""}\`\n\n${f.what}${tail}`, action: f.action ?? null });
       if (r.created) { posted++; fresh.push(f); } else if (r.updated) refreshed.push(f);
+      // Auto-approve: only for a finding whose check names an `auto` type that
+      // the config lists in `inbox.autoApprove`, and only when the action is
+      // the narrow shape that type promises (see autoApprovable). Everything
+      // else waits for a human, as always.
+      if (f.auto && r.status === "open" && autoApprovable(ctx, f)) {
+        await reply(ctx, r.id, `auto-approved: \`${f.auto}\` is listed in inbox.autoApprove`, { status: "approved" });
+        const [res] = await runApproved(ctx, { only: r.id });
+        if (res) auto.push({ ...f, id: r.id, ok: res.ok, message: res.message, trashed: res.trashed ?? null });
+      }
     }
     // One summary per run that did something: what was made, what is new, what
     // closed. The human reads one item instead of counting tickets.
-    if (news.length || fresh.length || closed.length || refreshed.length) {
+    autoApplied = auto;
+    if (!quiet && (news.length || fresh.length || closed.length || refreshed.length || auto.length)) {
       const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
       const lines = [`Ran ${checks.length - skipped.length} checks (\`${job}\`). ${findings.length} finding${findings.length === 1 ? "" : "s"}, ${posted} new in the inbox, ${closed.length} closed on their own${refreshed.length ? `, ${refreshed.length} rewritten with an action` : ""}.`];
       if (news.length) lines.push("", "**Done by the checks**", ...news.map((f) => `- ${f.what}`));
+      if (auto.length) lines.push("", "**Auto-approved (inbox.autoApprove)**", ...auto.map((f) => `- ${f.ok ? "✓" : "✗"} ${f.what.replace(/\n/g, " ").slice(0, 160)}`));
       if (fresh.length) lines.push("", "**New, waiting for you**", ...fresh.map((f) => `- ${f.kind === "proposal" ? "approve" : f.kind === "question" ? "answer" : "look"}: ${f.what.replace(/\n/g, " ").slice(0, 160)}`));
       if (closed.length) lines.push("", `**Closed on their own:** ${closed.length}`);
       await postItem(ctx, { kind: "report", from: "check", title: `Check run ${stamp}: ${news.length ? `${news.length} done, ` : ""}${posted} new, ${closed.length} closed`, fingerprint: `r${hashOf(`${job}|${stamp}`).slice(0, 7)}`, body: lines.join("\n") });
     }
   }
-  await writeStatus(ctx, job, { result: errors ? "partial" : "ok", done: checks.length - skipped.length, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox${closed.length ? `, ${closed.length} closed` : ""}`, findings: findings.length, inbox_new: posted, inbox_closed: closed.length, report: ctx.short(file) });
-  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted, closed: closed.length } };
+  // Every check skipped (the mail server was down) is "skipped", not "ok over
+  // zero work": silent-jobs must not read a quiet skip as a broken job.
+  const ranCount = checks.length - skipped.length;
+  await writeStatus(ctx, job, { result: errors ? "partial" : !ranCount && skipped.length ? "skipped" : "ok", done: ranCount, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox${closed.length ? `, ${closed.length} closed` : ""}`, findings: findings.length, inbox_new: posted, inbox_closed: closed.length, inbox_auto: autoApplied.length, drafts_trashed: autoApplied.filter((f) => f.auto === "draft-cleanup" && f.ok).length, report: file ? ctx.short(file) : null });
+  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted, closed: closed.length, auto: autoApplied.length, applied: autoApplied.map((f) => ({ type: f.auto, ok: f.ok, where: f.where, what: f.what, message: f.message })), trashed: autoApplied.filter((f) => f.auto === "draft-cleanup" && f.ok && f.trashed).map((f) => f.trashed) } };
 }
 
 function renderReport(ctx, { date, checks, findings, skipped, errors }) {
@@ -218,4 +245,47 @@ function renderReport(ctx, { date, checks, findings, skipped, errors }) {
   for (const s of skipped) lines.push("", `Skipped \`${s.check}\`: ${s.reason}.`);
   lines.push("", "Generated by `company-os check`.", "");
   return lines.join("\n");
+}
+
+/**
+ * May this finding be approved without a human? Two keys, both required:
+ * the config lists the finding's `auto` type in `inbox.autoApprove`, and the
+ * action has exactly the shape that type stands for. The shape is checked
+ * here, in the engine, so a check cannot widen what an approved type does.
+ *
+ *   "ball-line-sent" (drafts-vs-sent): an inward edit-markdown on one
+ *   account's status file that replaces its one ball line with one other
+ *   ball line, plus at most one dated line under a heading. Nothing else.
+ */
+export function autoApprovable(ctx, f) {
+  const allowed = ctx.config.inbox?.autoApprove ?? [];
+  if (!f?.auto || !allowed.includes(f.auto)) return false;
+  const a = f.action;
+  if (f.auto === "ball-line-sent") {
+    const acc = ctx.config.accounts ?? {};
+    if (!a || a.type !== "edit-markdown" || !a.inward || a.outward || a.append || a.appendReply || a.create) return false;
+    if (!acc.statusFile || !String(a.file ?? "").endsWith(`/${acc.statusFile}`) || String(a.file).includes("..")) return false;
+    if (!Array.isArray(a.replace) || a.replace.length !== 1) return false;
+    const { from, to } = a.replace[0] ?? {};
+    if (typeof from !== "string" || typeof to !== "string" || /\n/.test(from) || /\n/.test(to)) return false;
+    if (!findBallLine(from, acc) || !findBallLine(to, acc)) return false;
+    if (a.log && (typeof a.log.line !== "string" || /\n/.test(a.log.line))) return false;
+    const extra = Object.keys(a).filter((k) => !["type", "file", "replace", "log", "inward"].includes(k));
+    return extra.length === 0;
+  }
+  if (f.auto === "draft-cleanup") {
+    const opts = ctx.config.checks?.["drafts-vs-sent"] ?? {};
+    const drafts = opts.mailboxes?.drafts ?? "Drafts";
+    const imapDrafts = Object.entries(ctx.config.connectors ?? {}).find(([n, o]) => n === "imap" || o?.kind === "mail")?.[1]?.drafts ?? "Drafts";
+    if (f.check && f.check !== "drafts-vs-sent") return false;
+    if (opts.cleanupDrafts !== true) return false;
+    if (!a || a.type !== "trash-draft" || !a.inward || a.outward) return false;
+    if (a.mailbox !== drafts || a.mailbox !== imapDrafts) return false;
+    if (!Number.isInteger(a.uid) || a.uid <= 0) return false;
+    const e = a.expect;
+    if (!e || typeof e.subject !== "string" || typeof e.to !== "string" || !e.to || typeof e.date !== "string") return false;
+    const extra = Object.keys(a).filter((k) => !["type", "inward", "mailbox", "uid", "expect"].includes(k));
+    return extra.length === 0;
+  }
+  return false;
 }

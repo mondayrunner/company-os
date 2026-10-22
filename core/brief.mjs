@@ -14,7 +14,7 @@
 import { readFile } from "node:fs/promises";
 import { makeHelpers } from "./checks.mjs";
 import { clean, frontmatter, sections, tableUnder, titleOf } from "./markdown.mjs";
-import { slug } from "./markdown.mjs";
+import { slug, ballLabels } from "./markdown.mjs";
 
 /** Files whose name says they are a contact moment, newest of which is "last contact". */
 const CONTACT_PREFIXES = ["mail", "whatsapp", "transcript", "call", "gesprek", "review", "meeting", "notes"];
@@ -68,11 +68,14 @@ function touched(db, folder) {
 
 /** The "ball with" line of a status file, without the label. */
 export function ballOf(ctx, text) {
-  const label = clean(ctx.config.accounts.ballLine ?? "");
-  if (!label) return null;
-  const line = text.split("\n").map(clean).find((l) => l.includes(label));
-  if (!line) return null;
-  return line.slice(line.indexOf(label) + label.length).replace(/^[:\s]+/, "").replace(/\*+$/, "").trim().slice(0, 160) || null;
+  for (const raw of ballLabels(ctx.config.accounts)) {
+    const label = clean(raw);
+    if (!label) continue;
+    const line = text.split("\n").map(clean).find((l) => l.includes(label));
+    if (!line) continue;
+    return line.slice(line.indexOf(label) + label.length).replace(/^[:\s]+/, "").replace(/\*+$/, "").trim().slice(0, 160) || null;
+  }
+  return null;
 }
 
 /**

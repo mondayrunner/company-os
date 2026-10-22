@@ -28,6 +28,7 @@ import { join, dirname, basename, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
 import { frontmatter, setFrontmatter, hashOf } from "./markdown.mjs";
 import { runAgent } from "./run.mjs";
+import { trashDraft } from "./actions.mjs";
 import { languageName } from "./config.mjs";
 
 /**
@@ -113,6 +114,12 @@ function appendUnder(text, heading, line) {
   return re.test(text)
     ? text.replace(new RegExp(`(^## ${heading}\\s*\\n)`, "m"), `$1\n${line}\n`)
     : `${text.trimEnd()}\n\n## ${heading}\n\n${line}\n`;
+}
+
+/** A dated line as the newest entry under a heading (made at the end if missing), without extra blank lines. */
+function logLine(text, heading, line) {
+  const re = new RegExp(`^## ${heading}[ \\t]*\\n(?:[ \\t]*\\n)*`, "m");
+  return re.test(text) ? text.replace(re, (m) => `${m.replace(/\n+$/, "")}\n\n${line}\n`) : `${text.trimEnd()}\n\n## ${heading}\n\n${line}\n`;
 }
 
 /** The newest line of the human's reply, without its timestamp. */
@@ -201,6 +208,9 @@ async function applyAction(ctx, item) {
         text = text.replace(r.from, r.to);
       }
       if (a.append) text = text.trimEnd() + "\n" + a.append + "\n";
+      // A dated line under a heading the action names (`log: { under, line }`),
+      // for a check that knows exactly what to file: "sent on 21-10, subject X".
+      if (a.log?.line) text = logLine(text, a.log.under ?? "Log", a.log.line);
       // The human's reply is the line to write: "what came out of the call" goes
       // under the log heading as a dated entry, with whatever prefix the check
       // set ("- 2026-09-02 — Kickoff Harper: "). One sentence typed, one line filed.
@@ -228,6 +238,13 @@ async function applyAction(ctx, item) {
       await mkdir(dirname(to), { recursive: true });
       await rename(from, to);
       return { ok: true, message: `moved ${a.from} → ${a.to}` };
+    }
+    case "trash-draft": {
+      // A draft that a later sent mail made obsolete, to Trash. The mail
+      // connector refuses any mailbox but Drafts; this is not a send.
+      const r = await trashDraft(ctx, { uid: a.uid, mailbox: a.mailbox, expect: a.expect });
+      if (!r.ok) return { ok: false, message: `draft not moved: ${r.error}` };
+      return { ok: true, message: `moved to ${r.draft.trash}: draft ${r.draft.date?.slice(0, 16) ?? ""} to ${r.draft.to ?? "?"} · "${r.draft.subject}" (${r.draft.via})`, trashed: { date: r.draft.date, to: r.draft.to, subject: r.draft.subject } };
     }
     case "agent": return agentAction(ctx, item, [a.instruction, item.reply].filter(Boolean).join("\n\nReply from the human:\n"));
     default: return { ok: false, message: `unknown action type ${a.type}` };

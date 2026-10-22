@@ -1,8 +1,10 @@
 /**
  * "Ball with" in the pipeline row must agree with the account's status file.
  * Configure: pipeline.leads.ball (column), pipeline.ballSelf (words that mean
- * "me"), accounts.statusFile, accounts.ballLine.
+ * "me"), accounts.statusFile, accounts.ballLine (+ accounts.ballLines).
  */
+import { findBallLine } from "../core/markdown.mjs";
+
 export default {
   name: "ball-mismatch",
   description: "who holds the ball: pipeline row vs status file",
@@ -24,9 +26,10 @@ export default {
       const statusRel = `${f}/${a.statusFile}`;
       if (!(await h.exists(statusRel))) continue;
       const text = await h.read(statusRel);
-      const line = text.split("\n").find((l) => l.includes(a.ballLine));
-      if (!line) continue;
-      const statusBall = h.clean(line.split(a.ballLine)[1] ?? "").split(/[—–(:,.-]/)[0].trim();
+      const found = findBallLine(text, a);
+      if (!found) continue;
+      const line = found.line;
+      const statusBall = h.clean(found.holder).split(/[—–(:,.-]/)[0].trim();
       if (!statusBall) continue;
       if (self.test(ball) !== self.test(statusBall)) out.push({ severity: "warn", where: statusRel, what: `pipeline says ball with "${ball}", status file says "${statusBall}"`, text: line });
     }

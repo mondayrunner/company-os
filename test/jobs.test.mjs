@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cronField, parseCron, describeCron, launchdCalendar, systemdCalendar, renderLaunchd, renderCron } from "../core/jobs.mjs";
+import { cronField, parseCron, describeCron, launchdCalendar, systemdCalendar, renderLaunchd, renderCron, renderSystemd, everyMinutes } from "../core/jobs.mjs";
 
 test("cron fields", () => {
   assert.deepEqual(cronField("1-5", 0, 7), [1, 2, 3, 4, 5]);
@@ -38,4 +38,17 @@ test("rendered files carry the job", () => {
   const cron = renderCron(ctx, [job, { name: "ui", label: "com.x.ui", run: "company-os ui", service: true, log: "/tmp/ui.log" }]);
   assert.match(cron, /^0 8 \* \* 1 /m);
   assert.match(cron, /^@reboot /m);
+});
+
+test("every: a poll is one StartInterval, the same minutes for cron and systemd", () => {
+  const ctx = { root: "/tmp/vault", home: "/tmp/home", config: {} };
+  const job = { name: "sent-watch", label: "com.x.sent-watch", run: "company-os check --only drafts-vs-sent --quiet --job sent-watch", every: 900, log: "/tmp/sw.log" };
+  const plist = renderLaunchd(ctx, job);
+  assert.match(plist, /<key>StartInterval<\/key><integer>900<\/integer>/);
+  assert.doesNotMatch(plist, /StartCalendarInterval/);
+  assert.match(renderCron(ctx, [job]), /^\*\/15 \* \* \* \* /m);
+  assert.match(renderSystemd(ctx, job).timer, /OnCalendar=\*:0\/15/);
+  assert.equal(everyMinutes(job), 15);
+  assert.throws(() => everyMinutes({ name: "x", every: 420 }));
+  assert.throws(() => everyMinutes({ name: "x", every: 3600 }));
 });
