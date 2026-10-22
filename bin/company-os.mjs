@@ -20,7 +20,7 @@
  *
  * Keeping it honest
  *   boards [--create]         the boards this brain expects, made if you ask
- *   check [--no-live] [--only a,b] [--job name]  deterministic checks, report and inbox items
+ *   check [--no-live] [--only a,b] [--job name] [--quiet]  deterministic checks, report and inbox items (--quiet: no report file, no run summary)
  *   link [--dry-run]          attach waiting transcripts to accounts
  *   inbox list|show|post|reply|approve|reject|run   where agents talk back and you answer
  *   snapshot | event <file>   daily metrics; record one job run
@@ -120,8 +120,10 @@ try {
       break;
     }
     case "check": {
-      const r = await runChecks(ctx, db, { live: !flags["no-live"], only: flags.only?.split(","), job: flags.job ?? "check" });
-      if (flags.json) out(r); else console.log(readFileSync(r.report, "utf8"));
+      const r = await runChecks(ctx, db, { live: !flags["no-live"], only: flags.only?.split(","), job: flags.job ?? "check", quiet: !!flags.quiet });
+      if (flags.json) out(r);
+      else if (r.report) console.log(readFileSync(r.report, "utf8"));
+      else console.log(`${r.checks.length - r.skipped.length} checks, ${r.findings.length} findings, ${r.inbox.posted} new, ${r.inbox.closed} closed, ${r.inbox.auto} auto-applied${r.skipped.length ? `; skipped: ${r.skipped.map((s) => `${s.check} (${s.reason})`).join(", ")}` : ""}`);
       break;
     }
     case "live": {
@@ -178,7 +180,7 @@ function help() {
   accounts [--side x]        one line per open and won account
   canon [key] [--section s]  a canonical file by short name (no key: list them)
   link [--dry-run] [--smart] attach waiting transcripts to accounts
-  check [--no-live] [--only a,b] [--job name] [--json]   deterministic checks → report + status
+  check [--no-live] [--only a,b] [--job name] [--quiet] [--json]   deterministic checks → report + status (--quiet: inbox only, for frequent polls)
   live <kind> [what] [k=v]   read a live source raw (tasks cards, finance subscriptions, calendar today, mail unread)
   ticket <id>… [--repo d] [--who name] [--no-files] [--json]   cards as a brief: description, checklists, comments, attachments on disk (more ids = one brief for one agent)
   mail [query] [--uid n]     mail with the body: search, one by uid, or the latest unread

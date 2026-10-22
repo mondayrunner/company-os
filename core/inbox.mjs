@@ -115,6 +115,12 @@ function appendUnder(text, heading, line) {
     : `${text.trimEnd()}\n\n## ${heading}\n\n${line}\n`;
 }
 
+/** A dated line as the newest entry under a heading (made at the end if missing), without extra blank lines. */
+function logLine(text, heading, line) {
+  const re = new RegExp(`^## ${heading}[ \\t]*\\n(?:[ \\t]*\\n)*`, "m");
+  return re.test(text) ? text.replace(re, (m) => `${m.replace(/\n+$/, "")}\n\n${line}\n`) : `${text.trimEnd()}\n\n## ${heading}\n\n${line}\n`;
+}
+
 /** The newest line of the human's reply, without its timestamp. */
 function lastReplyLine(reply) {
   return String(reply ?? "").split("\n").map((l) => l.replace(/^_[^_]*_\s*/, "").trim()).filter(Boolean).pop() ?? "";
@@ -201,6 +207,9 @@ async function applyAction(ctx, item) {
         text = text.replace(r.from, r.to);
       }
       if (a.append) text = text.trimEnd() + "\n" + a.append + "\n";
+      // A dated line under a heading the action names (`log: { under, line }`),
+      // for a check that knows exactly what to file: "sent on 21-10, subject X".
+      if (a.log?.line) text = logLine(text, a.log.under ?? "Log", a.log.line);
       // The human's reply is the line to write: "what came out of the call" goes
       // under the log heading as a dated entry, with whatever prefix the check
       // set ("- 2026-09-02 — Kickoff Harper: "). One sentence typed, one line filed.

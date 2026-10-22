@@ -9,10 +9,15 @@
  *
  *   "imap": { "envFile": "~/.config/mail/.env", "host": "127.0.0.1", "port": 1143,
  *             "secure": false, "userName": "BRIDGE_USER", "passName": "BRIDGE_PASS",
- *             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>" }
+ *             "mailbox": "INBOX", "drafts": "Drafts", "from": "Jane <jane@example.com>",
+ *             "timeoutMs": 20000 }
+ *
+ * `timeoutMs` (default 20 s) bounds the connect and every command: a Bridge
+ * that is not running fails at once (ECONNREFUSED), one that hangs fails with
+ * code ETIMEDOUT instead of holding a scheduled job open.
  *
  * live({ what: "unread", limit: 40 })           → { unread, items: [{ uid, subject, from, address, date }] }
- * live({ what: "since", days: 30, limit: 300 })  → { found, items: [{ uid, subject, from, address, to, date }] }  headers only
+ * live({ what: "since", days: 30, limit: 300 })  → { found, items: [{ uid, subject, from, address, to, cc, date }] }  headers only
  * live({ what: "search", query, limit: 5 })     → { items: [{ uid, subject, from, address, to, date, body, attachments }] }
  * live({ what: "read", uid })                   → { item }
  * act("draft", { to, cc?, subject, body, attachments? })  → { mailbox, subject, to, replaced, chars, attached }  attachments = file paths
@@ -26,7 +31,15 @@ import { secret } from "../core/env.mjs";
 const BODY_CHARS = 6000;
 
 class Imap {
-  constructor(socket) { this.s = socket; this.n = 0; this.buf = ""; this.waiters = []; socket.on("data", (d) => this.onData(d.toString("binary"))); }
+  constructor(socket) {
+    this.s = socket; this.n = 0; this.buf = ""; this.waiters = [];
+    socket.on("data", (d) => this.onData(d.toString("binary")));
+    // A socket that dies or times out must fail the command waiting on it,
+    // not leave the promise (and the job) hanging.
+    const fail = (e) => { for (const w of this.waiters.splice(0)) w.reject(e); };
+    socket.on("error", fail);
+    socket.on("close", () => fail(Object.assign(new Error("imap: connection closed"), { code: "ECONNRESET" })));
+  }
   onData(chunk) {
     this.buf += chunk;
     const w = this.waiters[0];
@@ -139,13 +152,16 @@ function itemOf(uid, raw) {
   const { from, address } = fromParts(h.from);
   const { text, html, attachments } = bodyText(raw);
   const body = (text || stripHtml(html)).replace(/\r/g, "").trim();
-  return { uid, subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, date: h.date ? new Date(h.date).toISOString() : null,
+  return { uid, subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, cc: h.cc ?? null, date: h.date ? new Date(h.date).toISOString() : null,
     body: body.length > BODY_CHARS ? body.slice(0, BODY_CHARS) + "\n…" : body, truncated: body.length > BODY_CHARS, attachments };
 }
+
+const timeoutError = () => Object.assign(new Error("imap: timed out"), { code: "ETIMEDOUT" });
 
 async function open(options) {
   const host = options?.host ?? "127.0.0.1", port = options?.port ?? 1143;
   const socket = options?.secure ? tls({ host, port, rejectUnauthorized: options?.rejectUnauthorized ?? false }) : tcp({ host, port });
+  socket.setTimeout(options?.timeoutMs ?? 20000, () => socket.destroy(timeoutError()));
   await new Promise((res, rej) => { socket.once(options?.secure ? "secureConnect" : "connect", res); socket.once("error", rej); });
   const imap = new Imap(socket);
   await imap.greeting();
@@ -165,11 +181,11 @@ const uidsOf = (search) => (search.match(/\* SEARCH([^\r\n]*)/)?.[1] ?? "").trim
 async function fetchHeaders(imap, uids) {
   const items = [];
   if (!uids.length) return items;
-  const res = await imap.cmd(`UID FETCH ${uids.join(",")} (UID BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])`);
+  const res = await imap.cmd(`UID FETCH ${uids.join(",")} (UID BODY.PEEK[HEADER.FIELDS (FROM TO CC SUBJECT DATE)])`);
   for (const m of res.matchAll(/\* \d+ FETCH \(UID (\d+) BODY\[HEADER\.FIELDS \([^)]*\)\] \{(\d+)\}\r?\n([\s\S]*?)\r?\n\)/g)) {
     const h = parseHeaders(m[3]);
     const { from, address } = fromParts(h.from);
-    items.push({ uid: Number(m[1]), subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, date: h.date ? new Date(h.date).toISOString() : null });
+    items.push({ uid: Number(m[1]), subject: h.subject ?? "(no subject)", from, address, to: h.to ?? null, cc: h.cc ?? null, date: h.date ? new Date(h.date).toISOString() : null });
   }
   items.sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return items;

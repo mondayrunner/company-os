@@ -62,7 +62,7 @@ Nine connectors ship because we use them: **Trello** for work, **Paraspeech** fo
 - `paraspeech`: files recordings of ten minutes or more into the transcript inbox with a proposal for who they were with. `company-os link` attaches the ones it is sure about; the `unfiled-transcripts` check names the ones still waiting, otherwise that folder is the one place where doing nothing looks exactly like being up to date.
 - `stripe`: answers the money questions live, and `subscriptions-vs-accounts` says when a subscription and a folder disagree.
 
-The live sources are never copied, which leaves one gap: the source moved and the folder did not. Four checks close it, all the same shape (something happened, the folder's newest file is older, so it is not written down yet): `mail-vs-accounts`, `transcripts-vs-accounts`, `calendar-vs-accounts` and `board-vs-pipeline`. Each runs only when its connector is configured. Process the event into the folder and the finding closes itself.
+The live sources are never copied, which leaves one gap: the source moved and the folder did not. Four checks close it, all the same shape (something happened, the folder's newest file is older, so it is not written down yet): `mail-vs-accounts`, `transcripts-vs-accounts`, `calendar-vs-accounts` and `board-vs-pipeline`. A fifth, `drafts-vs-sent`, closes the gap from the other side: the folder still waits on a draft that Sent shows already went out. Each runs only when its connector is configured. Process the event into the folder and the finding closes itself.
 
 A finding is not a ticket for the human to work off. Where the check can carry the work itself it does: `board-vs-pipeline` with `sync: true` makes the missing cards and reports it; `mail-vs-accounts` and `transcripts-vs-accounts` post a *proposal* that carries the mails or the transcript, so approving it is enough and an agent writes the call into the status file; `calendar-vs-accounts` asks one sentence ("what came out of it?") and files the reply as a dated log line. What is left for the human is the judgement call, alive or lost, lead or casual contact, asked once for the group, not once per item. Every run that did something posts one summary so the inbox reads as news, not as a ticket queue.
 
@@ -105,6 +105,12 @@ Built in: `markdown`, `status`, `metrics-http`, `stripe`, `trello`, `tasks-markd
 
 Every finding and proposal is one markdown file in `inbox/`, fingerprinted so the same finding never lands twice. Approve and the brain applies it; reject and it stays quiet for good. The brain refuses outward actions by design.
 
+**Auto-approve, opt-in and narrow.** By default nothing runs without a human. A brain can name proposal types that may apply themselves in `inbox.autoApprove`. Today there is one: `"ball-line-sent"` from `drafts-vs-sent`. When the status file says the ball is with you to send a draft, and Sent shows that mail went out after the draft was written, the check replaces that one ball line ("ball with *whoever comes next* — sent 21-10 16:28: *subject*") and files one dated line under `## Log`. The engine itself checks the shape before it approves (`autoApprovable` in `core/checks.mjs`): an inward `edit-markdown` on a status file, one ball line in, one ball line out, at most one log line, nothing else. Any other action with that type waits for a human like everything else. Nothing is sent and no mail is deleted; drafts left behind in the Drafts folder are only listed.
+
+```json
+"inbox": { "autoApprove": ["ball-line-sent"] }
+```
+
 ## Jobs
 
 ```json
@@ -113,6 +119,8 @@ Every finding and proposal is one markdown file in `inbox/`, fingerprinted so th
   { "name": "check", "title": "Weekly checks", "run": "company-os check", "cron": "0 8 * * 1" }
 ]
 ```
+
+`"every": 900` instead of `cron` runs a job every 15 minutes (launchd `StartInterval`). For a silent poll, `company-os check --only drafts-vs-sent --quiet --job sent-watch`: `--quiet` writes no report file and no run summary, only inbox items. When the mail server is not reachable the check is skipped quietly and its open items stay open.
 
 `company-os jobs install` renders launchd (macOS), cron or systemd timers from the same list. Every job gets a status file, a rotating log and a row in the event history. `company-os jobs run <name>` runs one now.
 

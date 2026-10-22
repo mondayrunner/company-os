@@ -37,19 +37,25 @@ const TEXT_FILES = /\.(md|txt|eml)$/i;
 // The calendar mailing its own invitations, updates, acceptances and cancellations is not the contact writing.
 const CALENDAR = /^(re: |fwd?: )*(invitation|uitnodiging|update|cancellation|annulering|accepted|geaccepteerd|declined|afgewezen|tentative|voorlopig)\b|\baccepted by\b/i;
 
-/** Addresses mentioned anywhere in the folder's text files, lower-cased, minus our own and the generic ones. */
-async function addressesOf(ctx, folder, files, ignore) {
-  const out = new Set();
+/**
+ * Addresses mentioned anywhere in the folder's text files, lower-cased, minus
+ * our own. `incoming` also drops the generic ones (info@, noreply@): a mail
+ * *from* info@ is usually traffic. `outgoing` keeps them: a mail we sent *to*
+ * an address that is written in the folder is contact, info@ or not — a
+ * one-person business often has nothing else.
+ */
+export async function addressesOf(ctx, folder, files, ignore) {
+  const incoming = new Set(), outgoing = new Set();
   for (const f of files.filter((n) => TEXT_FILES.test(n))) {
     const text = await ctx.read(`${folder}/${f}`).catch(() => "");
     for (const m of text.match(EMAIL) ?? []) {
       const a = m.toLowerCase();
-      if (GENERIC.test(a)) continue;
       if (ignore.some((ig) => (ig.startsWith("@") ? a.endsWith(ig) : a === ig))) continue;
-      out.add(a);
+      if (!/^(no-?reply|noreply|mailer-daemon|postmaster|bounce)@/i.test(a)) outgoing.add(a);
+      if (!GENERIC.test(a)) incoming.add(a);
     }
   }
-  return out;
+  return { incoming, outgoing, size: incoming.size + outgoing.size };
 }
 
 const day = (iso) => (iso ?? "").slice(0, 10);
@@ -60,7 +66,9 @@ export function excerpt(body, max = 1500) {
   const own = String(body ?? "").replace(/\r/g, "").split(QUOTE)[0].trim();
   return own.length > max ? `${own.slice(0, max)}…` : own;
 }
-const addressesIn = (s) => (String(s ?? "").match(EMAIL) ?? []).map((a) => a.toLowerCase());
+export const addressesIn = (s) => (String(s ?? "").match(EMAIL) ?? []).map((a) => a.toLowerCase());
+/** Everyone a sent mail went to: To and Cc. */
+export const recipientsOf = (m) => [...addressesIn(m.to), ...addressesIn(m.cc)];
 
 export default {
   name: "mail-vs-accounts",
@@ -98,8 +106,8 @@ export default {
     const out = [];
     for (const k of known) {
       const hits = [];
-      for (const m of incoming) if (m.date && Date.parse(m.date) > k.touched && !traffic(m) && k.addresses.has((m.address ?? "").toLowerCase())) hits.push({ dir: "from", who: m.from || m.address, ...m });
-      for (const m of outgoing) if (m.date && Date.parse(m.date) > k.touched && !traffic(m) && addressesIn(m.to).some((t) => k.addresses.has(t))) hits.push({ dir: "to", who: addressesIn(m.to).find((t) => k.addresses.has(t)), ...m });
+      for (const m of incoming) if (m.date && Date.parse(m.date) > k.touched && !traffic(m) && k.addresses.incoming.has((m.address ?? "").toLowerCase())) hits.push({ dir: "from", who: m.from || m.address, ...m });
+      for (const m of outgoing) if (m.date && Date.parse(m.date) > k.touched && !traffic(m) && recipientsOf(m).some((t) => k.addresses.outgoing.has(t))) hits.push({ dir: "to", who: recipientsOf(m).find((t) => k.addresses.outgoing.has(t)), ...m });
       if (!hits.length) continue;
       hits.sort((x, y) => (y.date ?? "").localeCompare(x.date ?? ""));
       const top = hits.slice(0, max);

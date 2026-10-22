@@ -64,3 +64,20 @@ test("our own address never counts as a contact", async () => {
   mails = { INBOX: [{ uid: 1, subject: "Note to self", from: "Acme Studio", address: "studio@acme.example", date: "2026-09-08T09:00:00Z" }], Sent: [] };
   assert.deepEqual(await check.run(ctx, h, {}), []);
 });
+
+test("sent mail counts on Cc, and to an info@ address the folder names", async () => {
+  writeFileSync(join(ctx.root, lead, "mail-2026-09-04-proposal.txt"), "To: info@harper.example\nCc: jane@harper.example\nFrom: studio@acme.example\n\nHi Jane.\n");
+  utimesSync(join(ctx.root, lead, "mail-2026-09-04-proposal.txt"), touched, touched);
+  mails = { INBOX: [{ uid: 1, subject: "Newsletter", from: "Harper", address: "info@harper.example", date: "2026-09-08T09:00:00Z" }],
+    Sent: [{ uid: 2, subject: "Follow-up", from: "Acme Studio", address: "studio@acme.example", to: "info@harper.example", cc: null, date: "2026-09-08T10:00:00Z" },
+      { uid: 3, subject: "Cc only", from: "Acme Studio", address: "studio@acme.example", to: "other@else.example", cc: "Jane <jane@harper.example>", date: "2026-09-08T11:00:00Z" }] };
+  // fresh helpers: the read cache of the earlier tests still holds the old file
+  const h2 = makeHelpers(ctx, null, []);
+  h2.live = h.live;
+  const out = await check.run(ctx, h2, { bodies: false });
+  assert.equal(out.length, 1);
+  assert.match(out[0].what, /^2 mails newer/);
+  assert.match(out[0].what, /to info@harper.example 2026-09-08 "Follow-up"/);
+  assert.match(out[0].what, /to jane@harper.example 2026-09-08 "Cc only"/);
+  assert.doesNotMatch(out[0].what, /Newsletter/, "mail *from* info@ stays traffic");
+});
