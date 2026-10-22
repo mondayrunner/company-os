@@ -9,7 +9,7 @@ import { openDb } from "../core/db.mjs";
 import { makeHelpers, runChecks, autoApprovable } from "../core/checks.mjs";
 import { listItems } from "../core/inbox.mjs";
 import { findBallLine } from "../core/markdown.mjs";
-import check, { normSubject, nextHolder, mailFileMeta, leftoverDrafts } from "../checks/drafts-vs-sent.mjs";
+import check, { normSubject, nextHolder, mailFileMeta, leftoverDrafts, matchDraftFiles } from "../checks/drafts-vs-sent.mjs";
 import { draftsOnly, trashCommands, sameDraft } from "../connectors/imap.mjs";
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "company");
@@ -349,4 +349,78 @@ test("end to end: cleanupDrafts on but draft-cleanup not listed → the proposal
   assert.equal(r.inbox.auto, 0);
   assert.equal(JSON.parse(readFileSync(join(root, "mail-fixture.json"), "utf8")).Drafts.length, 1);
   assert.equal((await listItems(ctx)).find((i) => i.where === "Drafts#1").status, "open");
+});
+
+// ---- draft files ↔ sent mail: strict matching ----
+
+const TZ = "Europe/Amsterdam";
+const D = (id, day, subject = null, to = ["ops@client.example"], cc = [], at = Date.parse("2026-10-10T08:00:00Z")) => ({ id, day, subject, to, cc, at });
+const M = (subject, to, date, cc = null) => ({ subject, to, cc, date });
+
+test("draft files: four separate drafts of early September never match one October mail (window, declared date beats a bumped mtime)", () => {
+  const drafts = [D("a", "2026-09-01"), D("b", "2026-09-01"), D("c", "2026-09-02"), D("d", "2026-09-03")];
+  const r = matchDraftFiles(drafts, [M("Follow-up", "<ops@client.example>", "2026-10-11T09:00:00Z")], { timeZone: TZ });
+  assert.deepEqual(r.matched, []);
+  assert.deepEqual(r.unclear, []);
+});
+
+test("draft files: each draft gets its own mail, the closest in time; one mail never closes two drafts", () => {
+  const drafts = [D("a", "2026-09-01", "Part 1"), D("b", "2026-09-02", "Part 2"), D("c", "2026-09-03")];
+  const sent = [M("Part 1", "<ops@client.example>", "2026-09-01T10:00:00Z"), M("Re: part 2", "<ops@client.example>", "2026-09-02T10:00:00Z"), M("Part 3", "<ops@client.example>", "2026-09-03T10:00:00Z")];
+  const r = matchDraftFiles(drafts, sent, { timeZone: TZ });
+  assert.deepEqual(r.matched.map((x) => [x.draft.id, x.sent.subject]), [["a", "Part 1"], ["b", "Re: part 2"], ["c", "Part 3"]]);
+  // two untitled drafts of the same day, one mail: a tie is a question, not a guess
+  const tie = matchDraftFiles([D("x", "2026-09-05"), D("y", "2026-09-05")], [M("Hello", "<ops@client.example>", "2026-09-05T12:00:00Z")], { timeZone: TZ });
+  assert.deepEqual(tie.matched, []);
+  assert.deepEqual(tie.unclear.map((u) => u.draft.id).sort(), ["x", "y"]);
+  // an untitled draft with two mails of its own: a question listing both
+  const two = matchDraftFiles([D("z", "2026-09-06")], [M("One", "<ops@client.example>", "2026-09-06T12:00:00Z"), M("Two", "<ops@client.example>", "2026-09-07T12:00:00Z")], { timeZone: TZ });
+  assert.equal(two.matched.length, 0);
+  assert.deepEqual(two.unclear[0].candidates.map((c) => c.sent.subject), ["One", "Two"]);
+});
+
+test("draft files: the subject must match when the draft has one; mail before the draft or past the window does not count", () => {
+  const d = D("a", "2026-09-10", "Proposal");
+  assert.deepEqual(matchDraftFiles([d], [M("Invoice", "<ops@client.example>", "2026-09-11T09:00:00Z")], { timeZone: TZ }).matched, []);
+  assert.deepEqual(matchDraftFiles([d], [M("Proposal", "<ops@client.example>", "2026-09-09T09:00:00Z")], { timeZone: TZ }).matched, []);
+  assert.deepEqual(matchDraftFiles([d], [M("Proposal", "<ops@client.example>", "2026-10-05T09:00:00Z")], { timeZone: TZ }).matched, []);
+  assert.equal(matchDraftFiles([d], [M("Proposal", "<ops@client.example>", "2026-10-05T09:00:00Z")], { timeZone: TZ, windowDays: 30 }).matched.length, 1);
+  assert.equal(matchDraftFiles([d], [M("Re: proposal", "<ops@client.example>", "2026-09-10T15:00:00Z")], { timeZone: TZ }).matched.length, 1);
+});
+
+test("draft files: a contact only in Cc counts with a matching subject, and is only a question without one", () => {
+  const sent = [M("Recap of our session", "<lead@other.example>", "2026-10-20T15:00:00Z", "ops@client.example")];
+  const titled = matchDraftFiles([D("a", "2026-10-20", "Recap of our session")], sent, { timeZone: TZ });
+  assert.equal(titled.matched.length, 1);
+  const untitled = matchDraftFiles([D("b", "2026-10-20")], sent, { timeZone: TZ });
+  assert.deepEqual(untitled.matched, []);
+  assert.equal(untitled.unclear.length, 1);
+  assert.match(untitled.unclear[0].candidates[0].why, /only in Cc/);
+  // a recap with another subject where the contact is only in Cc: nothing at all
+  assert.deepEqual(matchDraftFiles([D("c", "2026-10-20", "Session notes")], sent, { timeZone: TZ }), { matched: [], unclear: [] });
+});
+
+test("check: a Cc-only mail and an untitled draft file → a question, no status edit and no ball-line change", async () => {
+  setup({ mailFile: "---\nstatus: draft in Drafts, not sent yet\nto: info@harper.example\n---\n\nHi,\n" });
+  mail = { Sent: [{ ...SENT, subject: "Recap", to: "<someone@else.example>", cc: "info@harper.example" }], Drafts: [] };
+  const out = await check.run(ctx, h, { leftovers: false });
+  assert.equal(out.length, 1);
+  assert.equal(out[0].kind, "question");
+  assert.equal(out[0].action, undefined);
+  assert.match(out[0].what, /^not sure which sent mail belongs to "mail-2026-10-21-intake.md": 21-10 16:28 "Recap"/);
+});
+
+test("check: the ball line needs the subject when the draft file names one", async () => {
+  setup();
+  mail = { Sent: [{ ...SENT, subject: "Something else entirely" }], Drafts: [] };
+  assert.deepEqual(await check.run(ctx, h, { leftovers: false }), []);
+  mail = { Sent: [SENT], Drafts: [] };
+  const out = await check.run(ctx, h, { leftovers: false });
+  assert.ok(out.some((f) => f.auto === "ball-line-sent"));
+});
+
+test("mailFileMeta: declared to, cc and date (frontmatter, else the file name)", () => {
+  const m = mailFileMeta("---\nstatus: concept\naan: a@b.example\ncc: c@d.example\ndatum: 2026-09-01\n---\n", "mail-2026-08-30-x.md");
+  assert.deepEqual([m.to, m.cc, m.day], ["a@b.example", "c@d.example", "2026-09-01"]);
+  assert.equal(mailFileMeta("---\nstatus: concept\n---\n", "mail-2026-08-30-x.md").day, "2026-08-30");
 });
