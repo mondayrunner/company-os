@@ -151,9 +151,22 @@ async function launchdPid(uid, label) {
   return m ? Number(m[1]) : null;
 }
 
+/**
+ * The jobs one install or uninstall acts on. `only` is a name or a comma list
+ * ("a,b"); a name that is not in the config is an error, not a silent no-op,
+ * so a typo cannot pass for "installed".
+ */
+export function selectJobs(jobs, only = null) {
+  if (!only) return jobs;
+  const names = String(only).split(",").map((s) => s.trim()).filter(Boolean);
+  const unknown = names.filter((n) => !jobs.some((j) => j.name === n));
+  if (unknown.length) throw new Error(`no job named ${unknown.join(", ")} (known: ${jobs.map((j) => j.name).join(", ")})`);
+  return jobs.filter((j) => names.includes(j.name));
+}
+
 /** Generate the files for a target into <root>/.company-os/jobs/<target>/ and install them. */
 export async function install(ctx, { target = detectTarget(), only = null, dryRun = false, force = false } = {}) {
-  const jobs = jobsOf(ctx).filter((j) => !only || j.name === only);
+  const jobs = selectJobs(jobsOf(ctx), only);
   const s = schedulerOf(ctx);
   await mkdir(s.logs, { recursive: true });
   const outDir = join(ctx.root, ".company-os", "jobs", target);
@@ -183,7 +196,9 @@ export async function install(ctx, { target = detectTarget(), only = null, dryRu
       done.push({ job: j.name, label: j.label, file: dest, ok, error });
     }
   } else if (target === "cron") {
-    const block = renderCron(ctx, jobs);
+    // The crontab holds one company-os block that is replaced whole, so it
+    // always carries every job; `only` cannot drop the others from it.
+    const block = renderCron(ctx, jobsOf(ctx));
     const file = join(outDir, "crontab.txt");
     await writeFile(file, block);
     if (!dryRun) {
@@ -213,7 +228,7 @@ export async function install(ctx, { target = detectTarget(), only = null, dryRu
 }
 
 export async function uninstall(ctx, { target = detectTarget(), only = null } = {}) {
-  const jobs = jobsOf(ctx).filter((j) => !only || j.name === only);
+  const jobs = selectJobs(jobsOf(ctx), only);
   const uid = process.getuid?.() ?? 501;
   const done = [];
   for (const j of jobs) {

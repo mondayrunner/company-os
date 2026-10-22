@@ -152,11 +152,11 @@ try {
     }
     case "serve": await serve(ctx, db); break;
     case "jobs": {
-      // company-os jobs list | install [--target launchd|cron|systemd] [name] [--dry-run] [--force] | uninstall [name] | run <name> [--force]
+      // company-os jobs list | install [--target launchd|cron|systemd] [name | --only a,b] [--dry-run] [--force] | uninstall [name | --only a,b] | run <name> [--force]
       const [sub, name] = rest;
       if (sub === "list" || !sub) out(await listJobs(ctx));
-      else if (sub === "install") out(await install(ctx, { target: flags.target, only: name ?? null, dryRun: !!flags["dry-run"], force: !!flags.force }));
-      else if (sub === "uninstall") out(await uninstall(ctx, { target: flags.target, only: name ?? null }));
+      else if (sub === "install") out(await install(ctx, { target: flags.target, only: flags.only ?? name ?? null, dryRun: !!flags["dry-run"], force: !!flags.force }));
+      else if (sub === "uninstall") out(await uninstall(ctx, { target: flags.target, only: flags.only ?? name ?? null }));
       // --force on a run says "I am asking, not the schedule": a job that
       // skips itself when today's work is done runs anyway. Same word the
       // dashboard's ▶ sends, so terminal and button do the same thing.
@@ -191,7 +191,7 @@ function help() {
   boards [client name] [--create]   the boards this brain expects; shows the plan, --create makes what is missing
   inbox list|post|reply|approve|reject|show|run   agents talk back here; approved items get executed
   serve                      MCP server over stdio for agents
-  jobs list|install|uninstall|run <name> [--force]   schedule the config's jobs on launchd, cron or systemd; --force runs a job that would skip itself
+  jobs list|install|uninstall|run <name> [--force]   schedule the config's jobs on launchd, cron or systemd; install/uninstall --only a,b for some; --force runs a job that would skip itself
   status                     what is in the brain
   import-legacy <db>         copy history from a pre-company-os database
   init [--name "..."] [--language xx] [--example]   config, folders and optionally a demo company

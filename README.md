@@ -125,7 +125,7 @@ Every finding and proposal is one markdown file in `inbox/`, fingerprinted so th
 
 `"every": 900` instead of `cron` runs a job every 15 minutes (launchd `StartInterval`). For a silent poll, `company-os check --only drafts-vs-sent --quiet --job sent-watch`: `--quiet` writes no report file and no run summary, only inbox items. When the mail server is not reachable the check is skipped quietly and its open items stay open.
 
-`company-os jobs install` renders launchd (macOS), cron or systemd timers from the same list. Every job gets a status file, a rotating log and a row in the event history. `company-os jobs run <name>` runs one now.
+`company-os jobs install` renders launchd (macOS), cron or systemd timers from the same list. Every job gets a status file, a rotating log and a row in the event history. `company-os jobs run <name>` runs one now. `company-os jobs install --only <job>` (or a comma list) installs just those and leaves the others as they are; an unknown name is an error.
 
 ## MCP
 
