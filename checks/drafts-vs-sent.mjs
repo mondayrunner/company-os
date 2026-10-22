@@ -19,9 +19,26 @@
  *   2. concept file: a `mail-*` file in the folder whose frontmatter status
  *      says concept/draft, with a matching sent mail. Proposal (never auto):
  *      set its status to "verstuurd <when>".
- *   3. leftovers: drafts in the Drafts folder whose recipient and subject
- *      match a mail sent after them. One finding that lists them. Nothing is
- *      deleted, ever: the human cleans up Drafts in the mail client.
+ *   3. leftovers: drafts in the Drafts folder that a later sent mail made
+ *      obsolete (the rule is leftoverDrafts below). By default one finding
+ *      that lists them; nothing is touched. With `cleanupDrafts: true`, one
+ *      proposal per draft instead: move it to Trash (recoverable) through the
+ *      mail connector's trashDraft, `auto: "draft-cleanup"`. Only the Drafts
+ *      mailbox, one UID per action, re-checked against subject/To/Date right
+ *      before the move.
+ *
+ * The leftover rule (conservative on purpose; a draft that is not clearly an
+ * old version stays):
+ *   - the draft has a Date and at least one To address;
+ *   - a mail in Sent was sent strictly AFTER the draft, and every To address
+ *     of the draft is among that mail's To addresses (Cc does not count);
+ *   - titled draft: same subject after normSubject (Re:/Fwd: prefixes,
+ *     quotes, whitespace and case stripped);
+ *     untitled draft (empty or "(no subject)"): the sent mail went out within
+ *     `untitledWindowMinutes` (default 30) after the draft;
+ *   - that sent mail is at least `settleMinutes` (default 10) old, so a draft
+ *     being edited right after sending is left alone this round.
+ *   A draft newer than every matching sent mail is never a leftover.
  *
  * When the mail server cannot be reached (Bridge not running, a timeout) the
  * check throws `{ skip: true }`: no finding, no crash, its open items stay.
@@ -34,7 +51,11 @@
  *   logUnder: "Log",                           // heading the dated line goes under
  *   timeZone: "Europe/Amsterdam",              // how times are written; default the machine's
  *   leftovers: true,                           // list drafts left behind after sending
- *   maxLeftovers: 20
+ *   maxLeftovers: 20,
+ *   cleanupDrafts: false,                      // true: propose moving each leftover to Trash
+ *   untitledWindowMinutes: 30,                 // untitled drafts: sent within this long after
+ *   settleMinutes: 10,                         // leave drafts alone until the sent mail is this old
+ *   maxCleanup: 20                             // at most this many trash proposals per run
  * }
  */
 import { readdir, stat } from "node:fs/promises";
@@ -70,6 +91,34 @@ export function mailFileMeta(text) {
   const { meta } = frontmatter(text);
   const subject = meta.onderwerp ?? meta.subject ?? head.match(/^(?:onderwerp|subject)\s*:\s*(.+)$/im)?.[1] ?? null;
   return { subject: subject ? subject.trim().replace(/^["']|["']$/g, "") : null, status: meta.status ?? null, hasFrontmatter: /^---\n[\s\S]*?\n---/.test(text) };
+}
+
+const UNTITLED = (s) => { const t = normSubject(s); return !t || t === "(no subject)" || t === "(geen onderwerp)"; };
+const toOf = (m) => addressesIn(m?.to ?? "").map((x) => x.toLowerCase());
+
+/**
+ * Drafts a later sent mail made obsolete: [{ draft, sent }], oldest draft
+ * first. The rule is in the header comment; `now` is for tests.
+ */
+export function leftoverDrafts(drafts, sent, { untitledWindowMinutes = 30, settleMinutes = 10, now = Date.now() } = {}) {
+  const out = [];
+  const window = untitledWindowMinutes * 60e3, settle = settleMinutes * 60e3;
+  for (const d of drafts ?? []) {
+    const dt = Date.parse(d?.date ?? "");
+    const to = toOf(d);
+    if (!Number.isFinite(dt) || !to.length) continue;
+    const untitled = UNTITLED(d.subject);
+    const subj = normSubject(d.subject);
+    const m = (sent ?? []).find((s) => {
+      const st = Date.parse(s?.date ?? "");
+      if (!Number.isFinite(st) || st <= dt || now - st < settle) return false;
+      const sto = toOf(s);
+      if (!to.every((r) => sto.includes(r))) return false;
+      return untitled ? st - dt <= window : !UNTITLED(s.subject) && normSubject(s.subject) === subj;
+    });
+    if (m) out.push({ draft: d, sent: m });
+  }
+  return out.sort((x, y) => (x.draft.date ?? "").localeCompare(y.draft.date ?? ""));
 }
 
 /** A failure to reach the mail server is a skip, not a crash. */
@@ -179,25 +228,32 @@ export default {
     }
 
     if (wantLeftovers) {
-      const left = [];
-      for (const d of drafts) {
-        const subj = normSubject(d.subject);
-        const rcpt = recipientsOf(d);
-        if (!d.date || !subj || subj === "(no subject)" || !rcpt.length) continue;
-        const m = sent.find((s) => Date.parse(s.date) > Date.parse(d.date) && normSubject(s.subject) === subj && recipientsOf(s).some((r) => rcpt.includes(r)));
-        if (m) left.push({ d, m });
-      }
-      if (left.length) {
+      const left = leftoverDrafts(drafts, sent, { untitledWindowMinutes: options.untitledWindowMinutes ?? 30, settleMinutes: options.settleMinutes ?? 10 });
+      const describe = ({ draft: d, sent: m }) => `"${UNTITLED(d.subject) ? (dutch ? "(geen onderwerp)" : "(no subject)") : d.subject}" ${dutch ? "aan" : "to"} ${toOf(d).join(", ")} (${dutch ? "concept" : "draft"} ${shortTime(d.date, tz)}, ${dutch ? "verstuurd" : "sent"} ${shortTime(m.date, tz)})`;
+      if (options.cleanupDrafts && left.length) {
+        // One proposal per draft, so each move is one UID, one approval, one line in the log.
+        for (const l of left.slice(0, options.maxCleanup ?? 20)) {
+          const d = l.draft;
+          out.push({
+            severity: "info", kind: "proposal", auto: "draft-cleanup", where: `${boxes.drafts}#${d.uid}`,
+            what: dutch ? `oud concept naar Prullenbak: ${describe(l)}` : `old draft to Trash: ${describe(l)}`,
+            hint: dutch
+              ? `Goedkeuren: dit ene concept gaat van ${boxes.drafts} naar de Prullenbak (terug te zetten in je mailprogramma). Er wordt niets verstuurd. Staat \`draft-cleanup\` in inbox.autoApprove, dan gebeurt dit vanzelf.`
+              : `Approve: this one draft moves from ${boxes.drafts} to Trash (restorable in the mail client). Nothing is sent. With \`draft-cleanup\` in inbox.autoApprove this happens by itself.`,
+            action: { type: "trash-draft", inward: true, mailbox: boxes.drafts, uid: d.uid, expect: { subject: d.subject, to: d.to, date: d.date } },
+          });
+        }
+      } else if (left.length) {
         const MAX = options.maxLeftovers ?? 20;
-        const list = left.slice(0, MAX).map(({ d, m }) => `"${d.subject}" ${dutch ? "aan" : "to"} ${recipientsOf(d)[0]} (${dutch ? "concept" : "draft"} ${shortTime(d.date, tz)}, ${dutch ? "verstuurd" : "sent"} ${shortTime(m.date, tz)})`);
+        const list = left.slice(0, MAX).map(describe);
         out.push({
           severity: "info", kind: "question", where: boxes.drafts,
           what: dutch
             ? `${left.length} concept${left.length === 1 ? "" : "en"} in ${boxes.drafts} ${left.length === 1 ? "is" : "zijn"} al verstuurd: ${list.join("; ")}${left.length > MAX ? `; +${left.length - MAX} meer` : ""}`
             : `${left.length} draft${left.length === 1 ? "" : "s"} in ${boxes.drafts} already sent: ${list.join("; ")}${left.length > MAX ? `; +${left.length - MAX} more` : ""}`,
           hint: dutch
-            ? `Ruim ze zelf op in je mailprogramma als ze weg mogen. Het brein verwijdert geen mail. Afwijzen = deze melding stil.`
-            : `Clean them up in your mail client if they can go. The brain never deletes mail. Reject to silence.`,
+            ? `Ruim ze zelf op in je mailprogramma als ze weg mogen, of zet \`cleanupDrafts\` aan. Afwijzen = deze melding stil.`
+            : `Clean them up in your mail client if they can go, or turn on \`cleanupDrafts\`. Reject to silence.`,
         });
       }
     }

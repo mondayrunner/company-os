@@ -123,7 +123,7 @@ try {
       const r = await runChecks(ctx, db, { live: !flags["no-live"], only: flags.only?.split(","), job: flags.job ?? "check", quiet: !!flags.quiet });
       if (flags.json) out(r);
       else if (r.report) console.log(readFileSync(r.report, "utf8"));
-      else console.log(`${r.checks.length - r.skipped.length} checks, ${r.findings.length} findings, ${r.inbox.posted} new, ${r.inbox.closed} closed, ${r.inbox.auto} auto-applied${r.skipped.length ? `; skipped: ${r.skipped.map((s) => `${s.check} (${s.reason})`).join(", ")}` : ""}`);
+      else console.log(`${r.checks.length - r.skipped.length} checks, ${r.findings.length} findings, ${r.inbox.posted} new, ${r.inbox.closed} closed, ${r.inbox.auto} auto-applied${r.inbox.trashed?.length ? ` (${r.inbox.trashed.length} old draft${r.inbox.trashed.length === 1 ? "" : "s"} to Trash)` : ""}${r.skipped.length ? `; skipped: ${r.skipped.map((s) => `${s.check} (${s.reason})`).join(", ")}` : ""}`);
       break;
     }
     case "live": {

@@ -212,7 +212,7 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
       if (f.auto && r.status === "open" && autoApprovable(ctx, f)) {
         await reply(ctx, r.id, `auto-approved: \`${f.auto}\` is listed in inbox.autoApprove`, { status: "approved" });
         const [res] = await runApproved(ctx, { only: r.id });
-        if (res) auto.push({ ...f, id: r.id, ok: res.ok, message: res.message });
+        if (res) auto.push({ ...f, id: r.id, ok: res.ok, message: res.message, trashed: res.trashed ?? null });
       }
     }
     // One summary per run that did something: what was made, what is new, what
@@ -231,8 +231,8 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
   // Every check skipped (the mail server was down) is "skipped", not "ok over
   // zero work": silent-jobs must not read a quiet skip as a broken job.
   const ranCount = checks.length - skipped.length;
-  await writeStatus(ctx, job, { result: errors ? "partial" : !ranCount && skipped.length ? "skipped" : "ok", done: ranCount, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox${closed.length ? `, ${closed.length} closed` : ""}`, findings: findings.length, inbox_new: posted, inbox_closed: closed.length, inbox_auto: autoApplied.length, report: file ? ctx.short(file) : null });
-  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted, closed: closed.length, auto: autoApplied.length } };
+  await writeStatus(ctx, job, { result: errors ? "partial" : !ranCount && skipped.length ? "skipped" : "ok", done: ranCount, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox${closed.length ? `, ${closed.length} closed` : ""}`, findings: findings.length, inbox_new: posted, inbox_closed: closed.length, inbox_auto: autoApplied.length, drafts_trashed: autoApplied.filter((f) => f.auto === "draft-cleanup" && f.ok).length, report: file ? ctx.short(file) : null });
+  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted, closed: closed.length, auto: autoApplied.length, applied: autoApplied.map((f) => ({ type: f.auto, ok: f.ok, where: f.where, what: f.what, message: f.message })), trashed: autoApplied.filter((f) => f.auto === "draft-cleanup" && f.ok && f.trashed).map((f) => f.trashed) } };
 }
 
 function renderReport(ctx, { date, checks, findings, skipped, errors }) {
@@ -271,6 +271,20 @@ export function autoApprovable(ctx, f) {
     if (!findBallLine(from, acc) || !findBallLine(to, acc)) return false;
     if (a.log && (typeof a.log.line !== "string" || /\n/.test(a.log.line))) return false;
     const extra = Object.keys(a).filter((k) => !["type", "file", "replace", "log", "inward"].includes(k));
+    return extra.length === 0;
+  }
+  if (f.auto === "draft-cleanup") {
+    const opts = ctx.config.checks?.["drafts-vs-sent"] ?? {};
+    const drafts = opts.mailboxes?.drafts ?? "Drafts";
+    const imapDrafts = Object.entries(ctx.config.connectors ?? {}).find(([n, o]) => n === "imap" || o?.kind === "mail")?.[1]?.drafts ?? "Drafts";
+    if (f.check && f.check !== "drafts-vs-sent") return false;
+    if (opts.cleanupDrafts !== true) return false;
+    if (!a || a.type !== "trash-draft" || !a.inward || a.outward) return false;
+    if (a.mailbox !== drafts || a.mailbox !== imapDrafts) return false;
+    if (!Number.isInteger(a.uid) || a.uid <= 0) return false;
+    const e = a.expect;
+    if (!e || typeof e.subject !== "string" || typeof e.to !== "string" || !e.to || typeof e.date !== "string") return false;
+    const extra = Object.keys(a).filter((k) => !["type", "inward", "mailbox", "uid", "expect"].includes(k));
     return extra.length === 0;
   }
   return false;

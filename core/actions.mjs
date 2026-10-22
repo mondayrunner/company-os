@@ -53,6 +53,19 @@ export async function mailDraft(ctx, { to, cc, subject, body, attachments } = {}
 }
 
 /**
+ * One draft from the Drafts mailbox to Trash, where the mail client can
+ * restore it. The connector refuses any other mailbox and re-checks that the
+ * UID is still the draft that was matched (`expect`: subject, to, date).
+ */
+export async function trashDraft(ctx, { uid, mailbox, expect } = {}) {
+  if (!uid || !expect) throw new Error("trashDraft needs uid and expect");
+  return traced(ctx, "trash draft", `${mailbox ?? "Drafts"} uid ${uid} · to ${expect.to ?? "?"} · ${expect.subject ?? ""}`.slice(0, 200), async () => {
+    const { connector, result } = await doAct(ctx, "mail", "trashDraft", { uid, mailbox, expect });
+    return { draft: result, source: connector };
+  });
+}
+
+/**
  * A board with its lists. Reversible the way a board is: you close it, and a
  * closed board can be reopened. Creating one is still a visible act in someone
  * else's workspace, so `core/boards.mjs` shows the plan before it calls this.

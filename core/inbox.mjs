@@ -28,6 +28,7 @@ import { join, dirname, basename, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
 import { frontmatter, setFrontmatter, hashOf } from "./markdown.mjs";
 import { runAgent } from "./run.mjs";
+import { trashDraft } from "./actions.mjs";
 import { languageName } from "./config.mjs";
 
 /**
@@ -237,6 +238,13 @@ async function applyAction(ctx, item) {
       await mkdir(dirname(to), { recursive: true });
       await rename(from, to);
       return { ok: true, message: `moved ${a.from} → ${a.to}` };
+    }
+    case "trash-draft": {
+      // A draft that a later sent mail made obsolete, to Trash. The mail
+      // connector refuses any mailbox but Drafts; this is not a send.
+      const r = await trashDraft(ctx, { uid: a.uid, mailbox: a.mailbox, expect: a.expect });
+      if (!r.ok) return { ok: false, message: `draft not moved: ${r.error}` };
+      return { ok: true, message: `moved to ${r.draft.trash}: draft ${r.draft.date?.slice(0, 16) ?? ""} to ${r.draft.to ?? "?"} · "${r.draft.subject}" (${r.draft.via})`, trashed: { date: r.draft.date, to: r.draft.to, subject: r.draft.subject } };
     }
     case "agent": return agentAction(ctx, item, [a.instruction, item.reply].filter(Boolean).join("\n\nReply from the human:\n"));
     default: return { ok: false, message: `unknown action type ${a.type}` };
