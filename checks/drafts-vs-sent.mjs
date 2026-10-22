@@ -10,15 +10,31 @@
  * things:
  *
  *   1. ball line: the status file's ball line is with you and mentions a draft
- *      ("versturen", "in Drafts"), and a mail to an address of that folder
- *      went out after the draft was written. Proposal: replace that one ball
+ *      ("versturen", "in Drafts"), and the folder's draft has one clear match
+ *      in Sent (the draft-file rule below). Proposal: replace that one ball
  *      line with "ball with <who comes next> — sent <when>: <subject>" and file
  *      one dated line under the log. `auto: "ball-line-sent"`: when the config
  *      lists that in `inbox.autoApprove`, the engine applies it without asking
  *      (see autoApprovable in core/checks.mjs for the exact shape allowed).
  *   2. concept file: a `mail-*` file in the folder whose frontmatter status
- *      says concept/draft, with a matching sent mail. Proposal (never auto):
- *      set its status to "verstuurd <when>".
+ *      says concept/draft, with one clear match in Sent. Proposal (never
+ *      auto): set its status to "verstuurd <when>".
+ *   When a draft has more than one candidate, or only a weak one, the check
+ *   asks instead: one question that lists the candidates, no status edit, no
+ *   ball-line change.
+ *
+ * The draft-file rule (matchDraftFiles; all of these):
+ *   - when the draft has a subject: the sent mail's normalized subject is the
+ *     same; the recipient may be in To, or in Cc (fallback, subject matched);
+ *   - when it has none: the recipient must be in To; Cc only is a weak
+ *     candidate and goes to the question;
+ *   - recipients are the addresses the mail file declares (`to:`/`aan:`,
+ *     `cc:`), else the folder's addresses;
+ *   - the sent date is on or after the draft's date (the file's `date:` or
+ *     the date in its name, else its mtime) and within `windowDays` (21);
+ *   - one sent mail matches at most one draft: the closest draft in time
+ *     wins, a tie is a question; a draft with several candidates of its own
+ *     is a question.
  *   3. leftovers: drafts in the Drafts folder that a later sent mail made
  *      obsolete (the rule is leftoverDrafts below). By default one finding
  *      that lists them; nothing is touched. With `cleanupDrafts: true`, one
@@ -55,7 +71,8 @@
  *   cleanupDrafts: false,                      // true: propose moving each leftover to Trash
  *   untitledWindowMinutes: 30,                 // untitled drafts: sent within this long after
  *   settleMinutes: 10,                         // leave drafts alone until the sent mail is this old
- *   maxCleanup: 20                             // at most this many trash proposals per run
+ *   maxCleanup: 20,                            // at most this many trash proposals per run
+ *   windowDays: 21                             // a draft file matches mail sent at most this long after it
  * }
  */
 import { readdir, stat } from "node:fs/promises";
@@ -86,11 +103,71 @@ export function nextHolder(holder) {
 }
 
 /** Subject and status a mail file declares about itself (frontmatter or a header block). */
-export function mailFileMeta(text) {
+export function mailFileMeta(text, name = "") {
   const head = String(text ?? "").split("\n").slice(0, 20).join("\n");
   const { meta } = frontmatter(text);
-  const subject = meta.onderwerp ?? meta.subject ?? head.match(/^(?:onderwerp|subject)\s*:\s*(.+)$/im)?.[1] ?? null;
-  return { subject: subject ? subject.trim().replace(/^["']|["']$/g, "") : null, status: meta.status ?? null, hasFrontmatter: /^---\n[\s\S]*?\n---/.test(text) };
+  const field = (...keys) => { for (const k of keys) { const v = meta[k] ?? head.match(new RegExp(`^${k}\\s*:\\s*(.+)$`, "im"))?.[1]; if (v != null && String(v).trim()) return String(v).trim().replace(/^["']|["']$/g, ""); } return null; };
+  const subject = field("onderwerp", "subject");
+  const declared = field("date", "datum", "created", "verstuurd_op");
+  const day = String(declared ?? "").match(/\b(\d{4}-\d\d-\d\d)\b/)?.[1] ?? String(name).match(/(\d{4}-\d\d-\d\d)/)?.[1] ?? null;
+  return { subject, status: meta.status ?? null, hasFrontmatter: /^---\n[\s\S]*?\n---/.test(text), to: field("to", "aan"), cc: field("cc"), day };
+}
+
+/** "2026-10-21" in the given time zone. */
+const dayOf = (iso, timeZone) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+
+/**
+ * Draft files ↔ sent mail, strictly (the rule is in the header comment).
+ * drafts: [{ id, subject, to: [addr], cc: [addr], day?: "YYYY-MM-DD", at: ms }]
+ *   `to`/`cc`: the addresses the file declares, or the folder's in `to`.
+ * Returns { matched: [{ draft, sent }], unclear: [{ draft, candidates: [{ sent, why }] }] }.
+ */
+export function matchDraftFiles(drafts, sent, { windowDays = 21, timeZone } = {}) {
+  const window = windowDays * 864e5;
+  const lower = (xs) => (xs ?? []).map((x) => String(x).toLowerCase());
+  const start = (d) => (d.day ? Date.parse(`${d.day}T00:00:00Z`) - 14 * 3600e3 : d.at);
+  const cands = new Map();
+  // A declared day is the draft's date; its mtime only sharpens it when both
+  // fall on that day (a checkout or sync moves mtimes forward, never back).
+  drafts = drafts.map((d) => (d.day && d.at && dayOf(new Date(d.at).toISOString(), timeZone) === d.day ? { ...d, day: null, _orig: d } : { ...d, _orig: d }));
+  for (const d of drafts) {
+    const to = lower(d.to), cc = lower(d.cc), all = [...to, ...cc];
+    const subj = d.subject && !UNTITLED(d.subject) ? normSubject(d.subject) : null;
+    const strong = [], weak = [];
+    for (const m of sent) {
+      const st = Date.parse(m?.date ?? "");
+      if (!Number.isFinite(st)) continue;
+      if (d.day ? dayOf(m.date, timeZone) < d.day : st < d.at) continue;
+      if (st - start(d) > window) continue;
+      const mto = toOf(m), mrc = recipientsOf(m);
+      const inTo = to.some((r) => mto.includes(r));
+      const inAny = all.some((r) => mrc.includes(r));
+      if (subj) {
+        if (normSubject(m.subject) !== subj) continue;
+        if (inTo) strong.push({ sent: m, gap: st - start(d), why: "subject + To" });
+        else if (inAny) strong.push({ sent: m, gap: st - start(d), why: "subject + Cc" });
+      } else if (inTo) strong.push({ sent: m, gap: st - start(d), why: "To, no subject on the draft" });
+      else if (inAny) weak.push({ sent: m, gap: st - start(d), why: "only in Cc, no subject on the draft" });
+    }
+    cands.set(d, { strong, weak });
+  }
+  // One sent mail, one draft: the closest draft wins; equally close is nobody's.
+  const owner = new Map();
+  for (const [d, { strong }] of cands) for (const c of strong) {
+    const o = owner.get(c.sent);
+    if (!o || c.gap < o.gap) owner.set(c.sent, { draft: d, gap: c.gap, tie: false });
+    else if (c.gap === o.gap && o.draft !== d) o.tie = true;
+  }
+  const matched = [], unclear = [];
+  for (const [d, { strong, weak }] of cands) {
+    const own = strong.filter((c) => { const o = owner.get(c.sent); return o.draft === d && !o.tie; });
+    const tied = strong.filter((c) => owner.get(c.sent).tie);
+    const orig = d._orig;
+    if (own.length === 1 && !tied.length) matched.push({ draft: orig, sent: own[0].sent });
+    else if (own.length > 1 || tied.length) unclear.push({ draft: orig, candidates: [...own, ...tied].map(({ sent, why }) => ({ sent, why })) });
+    else if (!strong.length && weak.length) unclear.push({ draft: orig, candidates: weak.map(({ sent, why }) => ({ sent, why })) });
+  }
+  return { matched, unclear };
 }
 
 const UNTITLED = (s) => { const t = normSubject(s); return !t || t === "(no subject)" || t === "(geen onderwerp)"; };
@@ -157,7 +234,7 @@ export default {
       for (const f of files.filter((n) => MAIL_FILE.test(n))) {
         const text = await h.read(`${folder}/${f}`).catch(() => "");
         const s = await stat(ctx.path(`${folder}/${f}`)).catch(() => null);
-        mails.push({ file: `${folder}/${f}`, mtime: s?.mtimeMs ?? 0, ...mailFileMeta(text) });
+        mails.push({ file: `${folder}/${f}`, mtime: s?.mtimeMs ?? 0, ...mailFileMeta(text, f) });
       }
       const concepts = mails.filter((m) => m.hasFrontmatter && m.status && /concept|draft/i.test(m.status) && !/^\s*(verstuurd|sent)\b/i.test(m.status));
       if (!ballWaits && !concepts.length) continue;
@@ -177,46 +254,56 @@ export default {
     sent = sent.filter((m) => m.date && Date.parse(m.date) >= cutoff && !CALENDAR.test(m.subject ?? "")).sort((x, y) => x.date.localeCompare(y.date));
 
     const out = [];
-    /** The first mail sent after `since` to an address of the folder, with one of `subjects` when the folder named any. */
-    const firstSent = (w, since, subjects) => sent.find((m) => Date.parse(m.date) > since && recipientsOf(m).some((r) => w.addresses.has(r)) && (!subjects.length || subjects.includes(normSubject(m.subject))));
+    // Every draft we want to place, across folders, so one sent mail can only
+    // close one of them. A folder with concept files places those; a folder
+    // whose ball waits without one places its newest mail file, or (no mail
+    // file at all) the status file's last change, To only.
+    const entries = [];
+    for (const w of waiting) {
+      const own = (m) => ({ to: m.to ? addressesIn(m.to) : [...w.addresses], cc: m.to ? addressesIn(m.cc ?? "") : [] });
+      for (const c of w.concepts) entries.push({ w, kind: "concept", c, id: c.file, subject: c.subject, ...own(c), day: c.day, at: c.mtime });
+      if (w.ball && !w.concepts.length) {
+        const newest = [...w.mails].sort((x, y) => (x.day ?? "").localeCompare(y.day ?? "") || x.mtime - y.mtime).pop();
+        entries.push(newest
+          ? { w, kind: "ball", c: newest, id: newest.file, subject: newest.subject, ...own(newest), day: newest.day, at: newest.mtime }
+          : { w, kind: "ball", c: null, id: w.statusRel, subject: null, to: [...w.addresses], cc: [], day: null, at: w.statusMtime });
+      }
+    }
+    const { matched, unclear } = matchDraftFiles(entries, sent, { windowDays: options.windowDays ?? 21, timeZone: tz });
+    const hit = new Map(matched.map((x) => [x.draft, x.sent]));
+
+    const ballFix = (w, m) => {
+      const to = recipientsOf(m).filter((r) => w.addresses.has(r));
+      const when = shortTime(m.date, tz);
+      // Who is next: the ball line's own "daarna bij …", else the same phrase on a
+      // to-do line of the status file that is also with you ("Bal bij Sam: draft
+      // versturen. Daarna bij Anna en Sanne"), else the recipient's name.
+      const todo = w.status.split("\n").find((l) => !/^\s*[-*]\s*\d{4}-\d\d-\d\d/.test(l) && self.test(l) && pending.test(l) && nextHolder(l));
+      const next = nextHolder(w.ball.holder) ?? (todo ? nextHolder(todo) : null) ?? (String(m.to ?? "").replace(/<[^>]+>/g, "").replace(/"/g, "").replace(/\s+,/g, ",").trim() || to[0]);
+      const raw = w.ball.line;
+      const at = raw.indexOf(w.ball.label) + w.ball.label.length;
+      const lead = /^[:\s]*(bij|with)\s/i.test(raw.slice(at)) ? `${raw.slice(at).match(/^[:\s]*(bij|with)\s/i)[1]} ` : "";
+      const line = `${raw.slice(0, at)} ${lead}${next} — ${dutch ? "verstuurd" : "sent"} ${when}: "${m.subject}" ${dutch ? "aan" : "to"} ${to.join(", ")} (auto, drafts-vs-sent)`;
+      const day = new Date().toISOString().slice(0, 10);
+      const log = dutch
+        ? `- ${day} — Verstuurd ${when}: "${m.subject}" aan ${to.join(", ")} (gezien in Sent). Bal-regel was: "${w.ball.holder}". Automatisch bijgewerkt door drafts-vs-sent.`
+        : `- ${day} — Sent ${when}: "${m.subject}" to ${to.join(", ")} (seen in Sent). Ball line was: "${w.ball.holder}". Updated by drafts-vs-sent.`;
+      out.push({
+        severity: "warn", kind: "proposal", auto: "ball-line-sent", where: w.statusRel,
+        what: dutch
+          ? `verstuurd ${when}: "${m.subject}" aan ${to.join(", ")}; de bal-regel staat nog bij jou: "${w.ball.holder.slice(0, 90)}"`
+          : `sent ${when}: "${m.subject}" to ${to.join(", ")}; the ball line still says it is with you: "${w.ball.holder.slice(0, 90)}"`,
+        hint: dutch
+          ? `Goedkeuren: de bal-regel wordt "${line.trim().slice(0, 160)}" en er komt één regel onder ## ${options.logUnder ?? "Log"}. Er wordt niets verstuurd. Staat \`ball-line-sent\` in inbox.autoApprove, dan gebeurt dit vanzelf.`
+          : `Approve: the ball line becomes "${line.trim().slice(0, 160)}" and one line goes under ## ${options.logUnder ?? "Log"}. Nothing is sent. With \`ball-line-sent\` in inbox.autoApprove this happens by itself.`,
+        action: { type: "edit-markdown", inward: true, file: w.statusRel, replace: [{ from: raw, to: line }], log: { under: options.logUnder ?? "Log", line: log } },
+      });
+    };
 
     for (const w of waiting) {
-      const subjects = [...new Set(w.mails.map((m) => m.subject).filter(Boolean).map(normSubject))];
-      if (w.ball) {
-        // The draft was written when its mail file was; without one, when the status file last changed.
-        const since = w.mails.length ? Math.max(...w.mails.map((m) => m.mtime)) : w.statusMtime;
-        const m = firstSent(w, since, subjects);
-        if (m) {
-          const to = recipientsOf(m).filter((r) => w.addresses.has(r));
-          const when = shortTime(m.date, tz);
-          // Who is next: the ball line's own "daarna bij …", else the same phrase on a
-          // to-do line of the status file that is also with you ("Bal bij Sam: draft
-          // versturen. Daarna bij Anna en Sanne"), else the recipient's name.
-          const todo = w.status.split("\n").find((l) => !/^\s*[-*]\s*\d{4}-\d\d-\d\d/.test(l) && self.test(l) && pending.test(l) && nextHolder(l));
-          const next = nextHolder(w.ball.holder) ?? (todo ? nextHolder(todo) : null) ?? (String(m.to ?? "").replace(/<[^>]+>/g, "").replace(/"/g, "").replace(/\s+,/g, ",").trim() || to[0]);
-          const raw = w.ball.line;
-          const at = raw.indexOf(w.ball.label) + w.ball.label.length;
-          const lead = /^[:\s]*(bij|with)\s/i.test(raw.slice(at)) ? `${raw.slice(at).match(/^[:\s]*(bij|with)\s/i)[1]} ` : "";
-          const line = `${raw.slice(0, at)} ${lead}${next} — ${dutch ? "verstuurd" : "sent"} ${when}: "${m.subject}" ${dutch ? "aan" : "to"} ${to.join(", ")} (auto, drafts-vs-sent)`;
-          const day = new Date().toISOString().slice(0, 10);
-          const log = dutch
-            ? `- ${day} — Verstuurd ${when}: "${m.subject}" aan ${to.join(", ")} (gezien in Sent). Bal-regel was: "${w.ball.holder}". Automatisch bijgewerkt door drafts-vs-sent.`
-            : `- ${day} — Sent ${when}: "${m.subject}" to ${to.join(", ")} (seen in Sent). Ball line was: "${w.ball.holder}". Updated by drafts-vs-sent.`;
-          out.push({
-            severity: "warn", kind: "proposal", auto: "ball-line-sent", where: w.statusRel,
-            what: dutch
-              ? `verstuurd ${when}: "${m.subject}" aan ${to.join(", ")}; de bal-regel staat nog bij jou: "${w.ball.holder.slice(0, 90)}"`
-              : `sent ${when}: "${m.subject}" to ${to.join(", ")}; the ball line still says it is with you: "${w.ball.holder.slice(0, 90)}"`,
-            hint: dutch
-              ? `Goedkeuren: de bal-regel wordt "${line.trim().slice(0, 160)}" en er komt één regel onder ## ${options.logUnder ?? "Log"}. Er wordt niets verstuurd. Staat \`ball-line-sent\` in inbox.autoApprove, dan gebeurt dit vanzelf.`
-              : `Approve: the ball line becomes "${line.trim().slice(0, 160)}" and one line goes under ## ${options.logUnder ?? "Log"}. Nothing is sent. With \`ball-line-sent\` in inbox.autoApprove this happens by itself.`,
-            action: { type: "edit-markdown", inward: true, file: w.statusRel, replace: [{ from: raw, to: line }], log: { under: options.logUnder ?? "Log", line: log } },
-          });
-        }
-      }
-      for (const c of w.concepts) {
-        const m = firstSent(w, c.mtime, c.subject ? [normSubject(c.subject)] : []);
-        if (!m) continue;
+      const mine = entries.filter((e) => e.w === w);
+      for (const e of mine.filter((e) => e.kind === "concept" && hit.has(e))) {
+        const m = hit.get(e), c = e.c;
         const when = shortTime(m.date, tz);
         out.push({
           severity: "warn", kind: "proposal", where: c.file,
@@ -225,6 +312,25 @@ export default {
           action: { type: "set-frontmatter", file: c.file, fields: { status: dutch ? `verstuurd ${when}` : `sent ${when}` } },
         });
       }
+      // The ball line only moves on a clear match, and never while one of the
+      // folder's drafts is unclear: then the question below decides.
+      if (w.ball && !unclear.some((u) => u.draft.w === w)) {
+        const m = mine.map((e) => hit.get(e)).filter(Boolean).sort((x, y) => x.date.localeCompare(y.date)).pop();
+        if (m) ballFix(w, m);
+      }
+    }
+    for (const u of unclear) {
+      const e = u.draft;
+      const list = u.candidates.slice(0, 6).map(({ sent: m, why }) => `${shortTime(m.date, tz)} "${m.subject}" ${dutch ? "aan" : "to"} ${[m.to, m.cc && `cc ${m.cc}`].filter(Boolean).join(" ").replace(/\s+/g, " ").slice(0, 80)} (${why})`);
+      out.push({
+        severity: "info", kind: "question", where: e.c?.file ?? e.w.statusRel,
+        what: dutch
+          ? `niet zeker welke verstuurde mail bij ${e.c ? `"${e.c.subject ?? e.c.file.split("/").pop()}"` : "de bal-regel"} hoort: ${list.join("; ")}`
+          : `not sure which sent mail belongs to ${e.c ? `"${e.c.subject ?? e.c.file.split("/").pop()}"` : "the ball line"}: ${list.join("; ")}`,
+        hint: dutch
+          ? `Er is niets aangepast. Antwoord met welke mail het was (of "geen"), dan werk ik het dossier bij. Afwijzen = deze melding stil.`
+          : `Nothing was changed. Reply with which mail it was (or "none") and approve. Reject to silence.`,
+      });
     }
 
     if (wantLeftovers) {
