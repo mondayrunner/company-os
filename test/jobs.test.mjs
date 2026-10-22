@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cronField, parseCron, describeCron, launchdCalendar, systemdCalendar, renderLaunchd, renderCron, renderSystemd, everyMinutes } from "../core/jobs.mjs";
+import { cronField, parseCron, describeCron, launchdCalendar, systemdCalendar, renderLaunchd, renderCron, renderSystemd, everyMinutes, selectJobs, install } from "../core/jobs.mjs";
+import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 test("cron fields", () => {
   assert.deepEqual(cronField("1-5", 0, 7), [1, 2, 3, 4, 5]);
@@ -51,4 +54,21 @@ test("every: a poll is one StartInterval, the same minutes for cron and systemd"
   assert.equal(everyMinutes(job), 15);
   assert.throws(() => everyMinutes({ name: "x", every: 420 }));
   assert.throws(() => everyMinutes({ name: "x", every: 3600 }));
+});
+
+test("install --only: just the named jobs, unknown names fail", async () => {
+  const all = [{ name: "a" }, { name: "b" }, { name: "c" }];
+  assert.equal(selectJobs(all, null), all);
+  assert.deepEqual(selectJobs(all, "b").map((j) => j.name), ["b"]);
+  assert.deepEqual(selectJobs(all, "c, a").map((j) => j.name), ["a", "c"]);
+  assert.throws(() => selectJobs(all, "b,typo"), /no job named typo/);
+  const root = await mkdtemp(join(tmpdir(), "cos-jobs-"));
+  try {
+    const ctx = { root, home: root, path: (p) => (p.startsWith("/") ? p : join(root, p)),
+      config: { scheduler: { logs: join(root, "logs") }, jobs: [{ name: "a", run: "true", cron: "0 8 * * 1" }, { name: "b", run: "true", every: 900 }] } };
+    const r = await install(ctx, { target: "launchd", only: "b", dryRun: true });
+    assert.deepEqual(r.jobs.map((j) => j.job), ["b"]);
+    assert.equal((await readdir(r.generated)).length, 1);
+    await assert.rejects(install(ctx, { target: "launchd", only: "nope", dryRun: true }), /no job named nope/);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
