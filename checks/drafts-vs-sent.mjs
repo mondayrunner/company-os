@@ -60,7 +60,9 @@
  * check throws `{ skip: true }`: no finding, no crash, its open items stay.
  *
  * Configure: checks["drafts-vs-sent"] = {
- *   days: 14,                                  // how far back Sent and Drafts are read
+ *   sentDays: 120,                             // how far back Sent is read (a draft can wait weeks)
+ *   sentLimit: 1000,                           // at most this many Sent headers
+ *   days: 14,                                  // how far back Drafts is read
  *   sides: null,                               // account sides; default open + won
  *   mailboxes: { sent: "Sent", drafts: "Drafts" },
  *   pending: "\\b(drafts?|concept\\w*|versturen|verstuur\\w*|sturen|send|sending)\\b",  // regex: a ball line waiting on a draft
@@ -80,7 +82,12 @@ import { findBallLine, frontmatter } from "../core/markdown.mjs";
 import { addressesOf, addressesIn, recipientsOf } from "./mail-vs-accounts.mjs";
 
 const PENDING = "\\b(drafts?|concept\\w*|versturen|verstuur\\w*|sturen|send|sending)\\b";
-const CALENDAR = /^(re: |fwd?: )*(invitation|uitnodiging|update|cancellation|annulering|accepted|geaccepteerd|declined|afgewezen|tentative|voorlopig)\b|\baccepted by\b/i;
+// What a mail client sends on its own when you answer or send an invite:
+// "Accepted: …", "Invitation: …", "Updated invitation: …". Only as the very
+// start of the subject: "Re: Invitation: …" is a reply someone typed.
+const CALENDAR = /^(invitation|uitnodiging|updated invitation|bijgewerkte uitnodiging|invitation updated|cancell?ation|cancell?ed event|annulering|geannuleerd|accepted|geaccepteerd|declined|afgewezen|geweigerd|tentative|tentatively accepted|voorlopig( geaccepteerd)?|proposed new time|nieuwe tijd voorgesteld)\s*:|\baccepted by\b/i;
+/** A calendar response or invite the client sent by itself, not a mail you wrote. */
+export const isCalendarMail = (subject) => CALENDAR.test(String(subject ?? "").trim());
 const MAIL_FILE = /^mail-.*\.(md|txt|eml)$/i;
 const NETWORK = /^(ECONNREFUSED|ETIMEDOUT|ECONNRESET|EHOSTUNREACH|ENETUNREACH|ENOTFOUND|EPIPE)$/;
 
@@ -213,11 +220,12 @@ export default {
   async run(ctx, h, options = {}) {
     const a = ctx.config.accounts;
     const days = options.days ?? 14;
+    const sentDays = options.sentDays ?? 120;
     const boxes = { sent: "Sent", drafts: "Drafts", ...(options.mailboxes ?? {}) };
     const pending = new RegExp(options.pending ?? PENDING, "i");
     const self = new RegExp(`\\b(${(ctx.config.pipeline?.ballSelf ?? ["me", "us"]).join("|")})\\b`, "i");
     const tz = options.timeZone ?? ctx.config.timeZone ?? undefined;
-    const cutoff = Date.now() - days * 864e5;
+    const cutoff = Date.now() - sentDays * 864e5;
     const mailConnector = Object.entries(ctx.config.connectors ?? {}).find(([n, o]) => n === "imap" || o?.kind === "mail")?.[1];
     const ignore = [...(ctx.config.checks?.["mail-vs-accounts"]?.ignore ?? []), ...(options.ignore ?? []), ...addressesIn(mailConnector?.from)].map((s) => s.toLowerCase());
     const dutch = nl(ctx);
@@ -248,10 +256,10 @@ export default {
 
     let sent = [], drafts = [];
     try {
-      sent = (await h.live("mail", { what: "since", days, mailbox: boxes.sent }))?.items ?? [];
+      sent = (await h.live("mail", { what: "since", days: sentDays, limit: options.sentLimit ?? 1000, mailbox: boxes.sent }))?.items ?? [];
       if (wantLeftovers && boxes.drafts) drafts = (await h.live("mail", { what: "since", days, mailbox: boxes.drafts }))?.items ?? [];
     } catch (e) { throw asSkip(e); }
-    sent = sent.filter((m) => m.date && Date.parse(m.date) >= cutoff && !CALENDAR.test(m.subject ?? "")).sort((x, y) => x.date.localeCompare(y.date));
+    sent = sent.filter((m) => m.date && Date.parse(m.date) >= cutoff && !isCalendarMail(m.subject)).sort((x, y) => x.date.localeCompare(y.date));
 
     const out = [];
     // Every draft we want to place, across folders, so one sent mail can only

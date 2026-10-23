@@ -6,8 +6,12 @@
  *
  *   "ics-calendar": { "envFile": "~/.config/daily-planner/.env", "urlName": "PROTON_ICS_URL" }   // or "url": "https://…"
  *
- * live({ what: "today" })                      → { items: [{ start, end, summary, allDay }] }
+ * live({ what: "today" })                      → { items: [{ start, end, summary, allDay, uid }] }
  * live({ what: "range", from, to })            → { days: { "YYYY-MM-DD": [items] } }
+ *
+ * `uid` is the event's UID (null when the feed has none). Every occurrence of a
+ * recurring event shares it; dates-vs-calendar uses it to tell a moved event
+ * from a removed one between two runs.
  */
 import { secret, fetchRetry } from "../core/env.mjs";
 
@@ -52,6 +56,7 @@ export function parseEvents(lines) {
     const utc = /Z$/.test(value), dateOnly = params.VALUE === "DATE";
     if (name === "DTSTART") { cur.start = parseDate(value, utc); cur.allDay = dateOnly; }
     else if (name === "DTEND") cur.end = parseDate(value, utc);
+    else if (name === "UID" && !cur.uid) cur.uid = value.trim();
     else if (name === "SUMMARY") cur.summary = value.replace(/\\,/g, ",").replace(/\\n/g, " ").replace(/\\\\/g, "\\").trim();
     else if (name === "RRULE") cur.rrule = parseRrule(value);
     else if (name === "EXDATE") { const d = parseDate(value, utc); if (d) cur.exdates.push(d); }
@@ -126,7 +131,7 @@ export function eventsOn(all, target) {
   return all.filter((ev) => occursOn(ev, target)).map((ev) => {
     const s = new Date(target); s.setHours(ev.start.getHours(), ev.start.getMinutes(), 0, 0);
     const e = ev.end ? new Date(s.getTime() + (ev.end - ev.start)) : null;
-    return { start: ev.allDay ? null : s.toISOString(), end: ev.allDay ? null : e?.toISOString() ?? null, summary: ev.summary || "(no title)", allDay: !!ev.allDay };
+    return { start: ev.allDay ? null : s.toISOString(), end: ev.allDay ? null : e?.toISOString() ?? null, summary: ev.summary || "(no title)", allDay: !!ev.allDay, uid: ev.uid ?? null };
   }).sort((a, b) => (a.allDay ? -1 : b.allDay ? 1 : a.start < b.start ? -1 : 1))
     .filter((e) => { const k = `${e.allDay ? "all" : e.start}|${e.summary}`; if (seen.has(k)) return false; seen.add(k); return true; });
 }

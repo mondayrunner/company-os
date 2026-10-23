@@ -9,7 +9,7 @@ import { openDb } from "../core/db.mjs";
 import { makeHelpers, runChecks, autoApprovable } from "../core/checks.mjs";
 import { listItems } from "../core/inbox.mjs";
 import { findBallLine } from "../core/markdown.mjs";
-import check, { normSubject, nextHolder, mailFileMeta, leftoverDrafts, matchDraftFiles } from "../checks/drafts-vs-sent.mjs";
+import check, { normSubject, nextHolder, mailFileMeta, leftoverDrafts, matchDraftFiles, isCalendarMail } from "../checks/drafts-vs-sent.mjs";
 import { draftsOnly, trashCommands, sameDraft } from "../connectors/imap.mjs";
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "company");
@@ -423,4 +423,25 @@ test("mailFileMeta: declared to, cc and date (frontmatter, else the file name)",
   const m = mailFileMeta("---\nstatus: concept\naan: a@b.example\ncc: c@d.example\ndatum: 2026-09-01\n---\n", "mail-2026-08-30-x.md");
   assert.deepEqual([m.to, m.cc, m.day], ["a@b.example", "c@d.example", "2026-09-01"]);
   assert.equal(mailFileMeta("---\nstatus: concept\n---\n", "mail-2026-08-30-x.md").day, "2026-08-30");
+});
+
+test("calendar mail: what the client sends by itself is skipped; a typed reply to an invite is not", () => {
+  for (const s of ["Accepted: Build day", "Invitation: Build day @ Mon 2 Nov", "Updated invitation: Build day", "Geaccepteerd: Bouwdag", "Declined: Build day", "Tentative: Build day", "Cancellation: Build day", "Build day — accepted by Jane"]) assert.equal(isCalendarMail(s), true, s);
+  for (const s of ["Re: Invitation: Build day @ Mon 2 Nov", "Fwd: Invitation: Build day", "Update on the build day", "Re: Accepted proposal", "Build day in November"]) assert.equal(isCalendarMail(s), false, s);
+});
+
+test("a typed reply to an invite closes the draft; Sent is read 120 days back, Drafts by days", async () => {
+  setup({ mailFile: "---\nstatus: draft in Drafts, not sent yet\nto: info@harper.example\nsubject: \"Re: Invitation: Build day @ Mon 2 Nov\"\n---\n\nHi Jane,\n" });
+  const asked = [];
+  const live = h.live;
+  h.live = async (kind, q) => { asked.push({ mailbox: q.mailbox, days: q.days }); return live(kind, q); };
+  mail = { Sent: [{ ...SENT, subject: "Re: Invitation: Build day @ Mon 2 Nov" }, { ...SENT, uid: 10, subject: "Accepted: Build day @ Mon 2 Nov", date: "2026-10-21T14:30:00Z" }], Drafts: [] };
+  const out = await check.run(ctx, h, {});
+  const ball = out.find((f) => f.auto === "ball-line-sent");
+  assert.ok(ball, JSON.stringify(out.map((f) => f.what)));
+  assert.match(ball.what, /"Re: Invitation: Build day @ Mon 2 Nov"/);
+  assert.deepEqual(asked, [{ mailbox: "Sent", days: 120 }, { mailbox: "Drafts", days: 14 }]);
+  asked.length = 0;
+  await check.run(ctx, h, { sentDays: 45, days: 7 });
+  assert.deepEqual(asked, [{ mailbox: "Sent", days: 45 }, { mailbox: "Drafts", days: 7 }]);
 });
