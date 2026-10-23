@@ -141,6 +141,8 @@ export default {
 
 Every finding becomes one inbox item, fingerprinted, so the same finding never lands twice. Stop reporting it and the item closes itself.
 
+A check that has to notice change in a live source (something that was there last run and is gone now) keeps its own small state file under `ctx.stateDir`, never in the vault. `dates-vs-calendar` does this: it writes the next 30 days of the calendar to `<stateDir>/calendar-snapshot.json` (event uid, title, day, start) and compares the next run against it, so a removed or moved appointment is noticed while the status file still names the old day. The live source stays the truth; the snapshot is only the memory of what it said last time.
+
 ## Add a job
 
 ```json
