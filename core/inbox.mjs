@@ -323,6 +323,27 @@ export async function expireReports(ctx, { days = 7 } = {}) {
   return closed;
 }
 
+/**
+ * Empty the inbox by hand: every open item is closed as `done`.
+ *
+ * Not `rejected`: a rejected finding is silenced for good (postItem finds its
+ * twin and posts nothing), and one button must not mute a hundred findings.
+ * `done` leaves the fingerprint free, so what is still true comes back with
+ * the next check and what was only news does not. Approved items stay: they
+ * are waiting to run, or running, and that is not this button's to decide.
+ */
+export async function clearOpen(ctx, { kind = null } = {}) {
+  const closed = [];
+  for (const item of await listItems(ctx, { status: "open" })) {
+    if (kind && item.kind !== kind) continue;
+    const { file, text } = await itemFile(ctx, item.id);
+    const stamp = `_${new Date().toISOString().slice(0, 16).replace("T", " ")}_ ✓ cleared by hand; not rejected, so it can come back if it is still true.`;
+    await writeFile(file, setFrontmatter(appendUnder(text, "Result", stamp), { status: "done" }));
+    closed.push(item.id);
+  }
+  return closed;
+}
+
 /** Mirror the inbox folder into the `inbox` table. */
 export async function indexInbox(ctx, db) {
   const items = await listItems(ctx);

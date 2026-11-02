@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { loadContext } from "../core/config.mjs";
 import { openDb } from "../core/db.mjs";
 import { indexAll } from "../core/index.mjs";
-import { postItem, listItems, reply, runApproved, indexInbox, expireReports } from "../core/inbox.mjs";
+import { postItem, listItems, reply, runApproved, indexInbox, expireReports, clearOpen } from "../core/inbox.mjs";
 import { runChecks } from "../core/checks.mjs";
 import { TOOLS, callTool } from "../mcp/server.mjs";
 
@@ -171,4 +171,19 @@ test("approving a finding with no action still gives the agent an instruction", 
 test("an inbox id cannot leave the inbox folder", async () => {
   const { reply } = await import("../core/inbox.mjs");
   for (const bad of ["../evil", "..", "a/b", "x%2F..%2Fy", ""]) await assert.rejects(() => reply(ctx, bad, "hi"), /invalid inbox id/);
+});
+
+test("emptying closes open items as done, leaves approved ones and does not silence", async () => {
+  const open = await postItem(ctx, { kind: "drift", from: "check", title: "Clear me", body: "…", fingerprint: "c1ea0001" });
+  const keep = await postItem(ctx, { kind: "proposal", from: "agent", title: "Approved already", body: "…" });
+  await reply(ctx, keep.id, "", { status: "approved" });
+  const closed = await clearOpen(ctx);
+  assert.ok(closed.includes(open.id));
+  assert.ok(!closed.includes(keep.id));
+  const items = await listItems(ctx);
+  assert.equal(items.find((i) => i.id === open.id).status, "done");
+  assert.equal(items.find((i) => i.id === keep.id).status, "approved");
+  // Not silenced: the same finding posted again is a new open item.
+  const again = await postItem(ctx, { kind: "drift", from: "check", title: "Clear me", body: "…", fingerprint: "c1ea0001" });
+  assert.equal(again.created, true);
 });

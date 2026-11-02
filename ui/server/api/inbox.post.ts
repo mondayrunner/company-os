@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
 import { join } from "node:path"
 
-// Post, reply, approve, reject or run. `run` executes approved items through the CLI
+// Post, reply, approve, reject, clear or run. `run` executes approved items through the CLI
 // (files under the root only; outward actions are refused by company-os itself).
 //
 // Running does not block the request. An agent run takes minutes, and a request
@@ -21,6 +21,14 @@ export default defineEventHandler(async (event) => {
     const { kind, from, title, where, body: itemBody, itemAction } = body
     if (!title) throw createError({ statusCode: 400, statusMessage: "title required" })
     return { ok: true, result: await postItem(ctx(), { kind, from, title, where, body: itemBody, action: itemAction }) }
+  }
+
+  // Emptying the inbox closes every open item as done, not rejected: nothing is
+  // silenced, so a finding that is still true comes back with the next check.
+  if (action === "clear") {
+    const { clearOpen } = await import("#core/inbox.mjs")
+    const closed = await clearOpen(ctx(), { kind: body.kind ?? null })
+    return { ok: true, result: { closed: closed.length } }
   }
 
   if (!["reply", "approve", "reject", "run"].includes(action)) throw createError({ statusCode: 400, statusMessage: "unknown action" })

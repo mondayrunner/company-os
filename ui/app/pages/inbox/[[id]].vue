@@ -25,6 +25,28 @@ const elapsed = (s: number) => (s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s %
 const working = ref<string | null>(null)
 const checked = ref<Set<string>>(new Set())
 const note = ref<string | null>(null)
+// Emptying is two presses: the first arms the button and says what it will do,
+// the second does it. It lapses by itself, so a stray click never closes a hundred items.
+const emptying = ref(false)
+let disarm: ReturnType<typeof setTimeout> | null = null
+async function empty() {
+  if (!emptying.value) {
+    emptying.value = true
+    disarm = setTimeout(() => { emptying.value = false }, 5000)
+    return
+  }
+  if (disarm) clearTimeout(disarm)
+  emptying.value = false
+  working.value = "clear"
+  note.value = null
+  try {
+    const r: any = await $fetch("/api/inbox", { method: "POST", body: { action: "clear" } })
+    if (!r?.ok) note.value = r?.error ?? "failed"
+    checked.value = new Set()
+    await refresh()
+  } catch (e: any) { note.value = e?.data?.error || e?.message || "failed" }
+  finally { working.value = null }
+}
 
 const sections = computed(() => [
   { key: "open", head: "Open", items: content.value?.open ?? [] },
@@ -85,7 +107,7 @@ function schedule(ms: number) {
   ticker = setInterval(() => refresh(), ms)
 }
 onMounted(() => watch(running, (r) => schedule(r.length ? 5000 : 15000), { immediate: true }))
-onBeforeUnmount(() => { if (ticker) clearInterval(ticker) })
+onBeforeUnmount(() => { if (ticker) clearInterval(ticker); if (disarm) clearTimeout(disarm) })
 
 async function bulk(action: "approve" | "reject") {
   const ids = actionable.value.map((i: any) => i.id)
@@ -149,6 +171,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
         <span class="text-[12px] font-semibold text-ink leading-none">Inbox</span>
         <button class="text-ink-3 hover:text-red transition-colors text-[11px] px-1 disabled:opacity-40" :disabled="busy" title="fetch again now" @click="refresh()"><span :class="busy && 'inline-block animate-spin'">↻</span></button>
         <span v-if="note" class="text-[11px] text-red truncate">{{ note }}</span>
+        <button v-if="content?.open.length" class="text-[11px] px-2 py-0.5 rounded-full transition-colors disabled:opacity-40" :class="emptying ? 'bg-red text-white' : 'text-ink-3 ring-1 ring-line hover:text-ink'" :disabled="working === 'clear'" :title="emptying ? 'press again to close every open item as done; nothing is rejected, so a finding that is still true comes back' : 'close every open item'" @click="empty">{{ working === 'clear' ? "…" : emptying ? `close all ${content.open.length}?` : "empty" }}</button>
         <span v-if="content" class="ml-auto text-[10px] px-2 py-0.5 rounded-full tabular font-semibold" :class="content.open.length ? 'bg-red text-white' : 'bg-card text-ink-3 ring-1 ring-line'">{{ content.open.length }} open</span>
       </div>
 

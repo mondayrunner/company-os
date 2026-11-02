@@ -22,7 +22,7 @@
  *   boards [--create]         the boards this brain expects, made if you ask
  *   check [--no-live] [--only a,b] [--job name] [--quiet]  deterministic checks, report and inbox items (--quiet: no report file, no run summary)
  *   link [--dry-run]          attach waiting transcripts to accounts
- *   inbox list|show|post|reply|approve|reject|run   where agents talk back and you answer
+ *   inbox list|show|post|reply|approve|reject|clear|run   where agents talk back and you answer
  *   snapshot | event <file>   daily metrics; record one job run
  *
  * Running it
@@ -49,7 +49,7 @@ import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
 import { ticket, tickets } from "../core/ticket.mjs";
 import { boards } from "../core/boards.mjs";
-import { postItem, listItems, reply, runApproved } from "../core/inbox.mjs";
+import { postItem, listItems, reply, runApproved, clearOpen } from "../core/inbox.mjs";
 import { serve } from "../mcp/server.mjs";
 import { install, uninstall, runJob, listJobs } from "../core/jobs.mjs";
 import { init, nextSteps } from "../core/init.mjs";
@@ -138,7 +138,7 @@ try {
     }
     case "inbox": {
       // company-os inbox list [--status open] | post --kind k --from f --title t [--file body.md] [--action json]
-      //                | reply <id> "text" [--approve|--reject] | approve <id> | reject <id> | run [--id x]
+      //                | reply <id> "text" [--approve|--reject] | approve <id> | reject <id> | clear [--kind k] | run [--id x]
       const [sub, id, ...words] = rest;
       if (sub === "list" || !sub) out((await listItems(ctx, { status: flags.status ?? null })).map(({ id, kind, from, created, status, title, action }) => ({ id, kind, from, created, status, title, action: action?.type ?? null })));
       else if (sub === "post") out(await postItem(ctx, { kind: flags.kind, from: flags.from ?? "cli", title: flags.title, body: flags.file ? readFileSync(flags.file, "utf8") : words.join(" "), action: flags.action ? JSON.parse(flags.action) : null }));
@@ -146,8 +146,9 @@ try {
       else if (sub === "approve") out(await reply(ctx, id, words.join(" "), { status: "approved" }));
       else if (sub === "reject") out(await reply(ctx, id, words.join(" "), { status: "rejected" }));
       else if (sub === "show") out((await listItems(ctx)).find((i) => i.id === id) ?? { error: "not found" });
+      else if (sub === "clear") { const closed = await clearOpen(ctx, { kind: flags.kind ?? null }); await indexAll(ctx, db, { only: ["markdown"] }); out({ closed: closed.length, ids: closed }); }
       else if (sub === "run") { out(await runApproved(ctx, { only: flags.id ?? null })); await indexAll(ctx, db, { only: ["markdown"] }); }
-      else { console.error("inbox: list | post | reply | approve | reject | show | run"); process.exit(1); }
+      else { console.error("inbox: list | post | reply | approve | reject | show | clear | run"); process.exit(1); }
       break;
     }
     case "serve": await serve(ctx, db); break;
@@ -189,7 +190,7 @@ function help() {
   task-done <id> [--list l]  move a card to done (reversible, logged)
   draft --to a --title s --file body.txt [--cc a] [--attach f.pdf …]   a draft in the mail client (never sends)
   boards [client name] [--create]   the boards this brain expects; shows the plan, --create makes what is missing
-  inbox list|post|reply|approve|reject|show|run   agents talk back here; approved items get executed
+  inbox list|post|reply|approve|reject|show|clear|run   agents talk back here; approved items get executed
   serve                      MCP server over stdio for agents
   jobs list|install|uninstall|run <name> [--force]   schedule the config's jobs on launchd, cron or systemd; install/uninstall --only a,b for some; --force runs a job that would skip itself
   status                     what is in the brain
