@@ -53,7 +53,14 @@ export default {
           }
           if (seen.has(target)) continue;
           seen.add(target);
-          if (!(await exists(target))) out.push({ severity: absolute ? "error" : "warn", where: ctx.short(abs), line: i + 1, what: `path does not exist: ${raw}`, text: lines[i] });
+          if (await exists(target)) continue;
+          // A rule document outside the root (../CLAUDE.md, a map of sibling folders)
+          // names paths in its own folders. A first segment that also happens to be
+          // a folder in the root ("scripts/") must not send the lookup to the root
+          // only: look one level down from the document too, as the unknown-folder
+          // branch above already does.
+          if (!absolute && dirname(abs) !== ctx.root && await existsInSubdir(subdirs, dirname(abs), p)) continue;
+          out.push({ severity: absolute ? "error" : "warn", where: ctx.short(abs), line: i + 1, what: `path does not exist: ${raw}`, text: lines[i] });
         }
       }
     }

@@ -71,3 +71,19 @@ test("search: a hit in the path outranks a chatty note that repeats the word", a
   assert.equal(new Set(hits.map((h) => h.path)).size, hits.length, "one hit per document");
 });
 
+
+test("doc-paths: a document outside the root finds paths in its own folders", async () => {
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const { default: docPaths } = await import("../checks/doc-paths.mjs");
+  // parent/CLAUDE.md maps sibling folders; both `brain/` and `app/` have a scripts/ folder.
+  const parent = mkdtempSync(join(tmpdir(), "company-os-docpaths-"));
+  mkdirSync(join(parent, "brain", "scripts"), { recursive: true });
+  mkdirSync(join(parent, "app", "scripts"), { recursive: true });
+  writeFileSync(join(parent, "app", "scripts", "backup.sh"), "");
+  const doc = join(parent, "CLAUDE.md");
+  writeFileSync(doc, "| `app/` | backs up with `scripts/backup.sh` and `scripts/missing.sh` |\n");
+  const c = { root: join(parent, "brain"), home: parent, path: (p) => join(join(parent, "brain"), p), short: (p) => p, config: { checks: { docs: ["../CLAUDE.md"] } } };
+  const found = await docPaths.run(c, { read: async (p) => (await import("node:fs/promises")).readFile(p, "utf8") });
+  assert.equal(found.length, 1);
+  assert.match(found[0].what, /scripts\/missing\.sh/);
+});
