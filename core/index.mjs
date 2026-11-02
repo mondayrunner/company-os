@@ -119,25 +119,43 @@ export async function writeMetricsFile(ctx, db) {
  * often it was "partial" — lived only in the database. So it is now also a
  * line per run in the vault, which git keeps and `index` reads back.
  */
+const RUN_BASE = ["ts", "job", "result", "done", "failed", "message"];
+
+/** Parse the events.json blob; invalid/empty becomes `{}`. Never throws. */
+function parseRunExtras(json) {
+  try {
+    const v = JSON.parse(json || "{}");
+    if (v && typeof v === "object" && !Array.isArray(v)) return v;
+  } catch {}
+  return {};
+}
+
 export async function writeRunsFile(ctx, db) {
   const file = ctx.path(ctx.config.runsFile ?? "runs.jsonl");
-  const rows = db.prepare("SELECT ts, job, result, done, failed, message FROM events ORDER BY ts, job").all();
+  const rows = db.prepare("SELECT ts, job, result, done, failed, message, json FROM events ORDER BY ts, job").all();
   if (!rows.length) return { file, rows: 0 };
   await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  // Base fields stay authoritative and win over anything in the blob. A row
+  // with no extras stringifies exactly as before (no empty `json` key).
+  const line = ({ json, ...base }) => JSON.stringify({ ...parseRunExtras(json), ...base });
+  await writeFile(file, rows.map(line).join("\n") + "\n");
   return { file: ctx.short(file), rows: rows.length };
 }
 
 export async function readRunsFile(ctx, db) {
   const text = await readFile(ctx.path(ctx.config.runsFile ?? "runs.jsonl"), "utf8").catch(() => null);
   if (!text) return 0;
-  const ins = db.prepare("INSERT OR IGNORE INTO events (ts, job, result, done, failed, message) VALUES (?,?,?,?,?,?)");
+  const ins = db.prepare("INSERT OR IGNORE INTO events (ts, job, result, done, failed, message, json) VALUES (?,?,?,?,?,?,?)");
   let n = 0;
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
     try {
       const r = JSON.parse(line);
-      if (r.ts && r.job) n += ins.run(r.ts, r.job, r.result ?? null, r.done ?? null, r.failed ?? null, r.message ?? null).changes;
+      if (!r.ts || !r.job) continue;
+      const extras = {};
+      for (const [k, v] of Object.entries(r)) if (!RUN_BASE.includes(k)) extras[k] = v;
+      const json = Object.keys(extras).length ? JSON.stringify(extras) : null;
+      n += ins.run(r.ts, r.job, r.result ?? null, r.done ?? null, r.failed ?? null, r.message ?? null, json).changes;
     } catch {}   // one broken line must not take the rest with it
   }
   return n;
