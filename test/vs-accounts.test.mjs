@@ -41,7 +41,8 @@ before(async () => {
 });
 
 test("transcripts: a recording after the status file is a finding; one written up already is not", async () => {
-  const out = await transcripts.run(ctx, h, {});
+  // The fixture's recording has a fixed date; the default 60-day window would make this test expire.
+  const out = await transcripts.run(ctx, h, { days: 36500 });
   assert.equal(out.length, 1);
   assert.equal(out[0].where, `${lead}/STATUS.md`);
   assert.match(out[0].what, /`transcripts\/2026-09-06-abc\.md` \(2026-09-06, 25 min, Zoom\) "Hi Jane, about the site"/);
