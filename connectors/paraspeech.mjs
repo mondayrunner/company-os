@@ -5,12 +5,14 @@
  * belong to. You confirm by setting the account key in the frontmatter (or by
  * moving the file into the account folder); `company-os index` reads that back.
  *
- *   "paraspeech": { "minSeconds": 600, "minChars": 8000 }
+ *   "paraspeech": { "minSeconds": 600, "minChars": 8000, "minWords": 150 }
  *
  * What it skips is the point: a ten-second dictation into an editor is a prompt,
  * not a conversation. Imported recordings and anything ten minutes or longer are
  * candidates; the rest is left alone, because an inbox that fills with your own
- * shell commands is an inbox you stop reading.
+ * shell commands is an inbox you stop reading. A long recording with almost no
+ * words (the microphone stayed on, music played) is skipped too: under
+ * `minWords` there is no conversation to file.
  *
  * The frontmatter keys for the account and the proposal come from the config, so
  * a vault that already speaks its own vocabulary keeps it.
@@ -19,7 +21,7 @@ import { DatabaseSync } from "node:sqlite";
 import { copyFile, mkdir, readdir, writeFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadNames } from "../core/link.mjs";
+import { loadNames, nameRe } from "../core/link.mjs";
 
 const APPLE_EPOCH = 978307200;
 const dbPath = (ctx, options) => (options?.database ? ctx.path(options.database) : join(ctx.home, "Library/Containers/me.offlocalhost.Paraspeech/Data/Library/Application Support/Paraspeech/Database/paraspeech.sqlite"));
@@ -38,10 +40,12 @@ export function proposal(text, index) {
   const out = new Map();
   for (const v of index.values()) {
     const n = String(v.name ?? "").toLowerCase();
-    if (n.length >= 4 && t.includes(n)) for (const a of v.accounts ?? []) out.set(a, (out.get(a) ?? 0) + 1);
+    if (n.length >= 4 && nameRe(n).test(t)) for (const a of v.accounts ?? []) out.set(a, (out.get(a) ?? 0) + 1);
   }
   return [...out.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a]) => a);
 }
+
+export const wordCount = (text) => String(text ?? "").split(/\s+/).filter(Boolean).length;
 
 async function* mdNames(dir, skip) {
   let ents = [];
@@ -90,12 +94,13 @@ export default {
     let index = new Map();
     try { index = await loadNames(ctx); } catch { /* no names module: no proposal, still a file */ }
 
-    let added = 0;
+    let added = 0, quiet = 0;
     for (const r of rows) {
       const date = new Date((r.t + APPLE_EPOCH) * 1000);
       const id = r.id.slice(0, 8).toLowerCase();
       const base = `${date.toISOString().slice(0, 10)}-${id}`;
       if (inInbox.has(base) || [...everywhere].some((b) => b.includes(id))) continue;
+      if (wordCount(r.text) < (options.minWords ?? 150)) { quiet++; continue; }
       const kind = r.origin === "file" ? "recording" : "conversation";
       const accounts = proposal(r.text + " " + r.notes, index);
       const head = r.text.replace(/\s+/g, " ").slice(0, 80);
@@ -109,6 +114,6 @@ export default {
       await writeFile(join(inbox, `${base}.md`), md);
       added++;
     }
-    return { count: rows.length, added, message: added ? `${added} new in ${inboxRel}/` : "nothing new" };
+    return { count: rows.length, added, message: `${added ? `${added} new in ${inboxRel}/` : "nothing new"}${quiet ? ` · ${quiet} skipped (under ${options.minWords ?? 150} words)` : ""}` };
   },
 };

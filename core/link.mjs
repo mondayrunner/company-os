@@ -12,6 +12,11 @@
  * Reversible: the marker `linked_by: company-os link` sits in the frontmatter;
  * a human simply overwrites the line.
  *
+ * Names are scored on what was said (notes and transcript), as whole words;
+ * the title and the connector's own proposal line above them do not count.
+ * Each open transcript has one question in the inbox, and that question
+ * closes by itself once the transcript is attached or gone.
+ *
  * `--smart` adds one headless agent run over what is still open; only "high"
  * confidence is applied, "medium" becomes a proposal.
  *
@@ -25,7 +30,7 @@ import { frontmatter, setFrontmatter, hashOf } from "./markdown.mjs";
 const hashPart = (s) => hashOf(s).slice(0, 7);
 import { runAgent, fill } from "./run.mjs";
 import { languageName } from "./config.mjs";
-import { postItem } from "./inbox.mjs";
+import { postItem, resolveStale } from "./inbox.mjs";
 
 const PROMPTS = join(dirname(fileURLToPath(import.meta.url)), "..", "prompts");
 const MARKER = "company-os link";
@@ -50,6 +55,20 @@ function isLinked(meta, ctx) {
   return a && String(a).trim() && !(Array.isArray(a) && !a.length);
 }
 
+/** A name as a whole word: "north" is not in "northern". */
+export const nameRe = (n) => new RegExp(`(^|[^a-z0-9])${String(n).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i");
+
+/**
+ * What was actually said: the notes and the transcript, from the first
+ * section heading on. The lines above it are ours (the title, and the
+ * connector's own "belongs to `accounts/acme`?" proposal); scoring those
+ * turns a guess into its own evidence.
+ */
+export function spoken(body) {
+  const at = body.search(/^## /m);
+  return at === -1 ? body : body.slice(at);
+}
+
 function scoreAccounts(ctx, text, index) {
   const t = text.toLowerCase();
   const strongSet = strongSources(ctx);
@@ -60,8 +79,7 @@ function scoreAccounts(ctx, text, index) {
     if (n.length < 4 || !(v.accounts?.size)) continue;
     const sources = v.sources ?? new Set();
     const strong = n.length >= 5 && [...sources].some((s) => strongSet.has(s)) && !weak.every((s) => sources.has(s));
-    const re = new RegExp(`(^|[^a-z0-9])${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`, "i");
-    if (!re.test(t)) continue;
+    if (!nameRe(n).test(t)) continue;
     for (const a of v.accounts) {
       if (!per.has(a)) per.set(a, { names: new Set(), strong: false });
       per.get(a).names.add(n);
@@ -85,7 +103,7 @@ export async function link(ctx, { dryRun = false } = {}) {
     const { meta, body } = frontmatter(text);
     if (isLinked(meta, ctx)) continue;
     out.seen++;
-    const scores = scoreAccounts(ctx, body, index);
+    const scores = scoreAccounts(ctx, spoken(body), index);
     const [top, second] = scores;
     const unambiguous = top && (!second || top.score >= 2 * second.score);
     const proposal = `[${scores.slice(0, 3).map((s) => s.account).join(", ")}]`;
@@ -107,6 +125,12 @@ export async function link(ctx, { dryRun = false } = {}) {
         body: `${describe(meta, body)}\n\n${scores.length ? `Candidates: ${scores.slice(0, 3).map((s) => `\`${s.account}\` (${s.names.join(", ")})`).join(", ")}` : "No account name recognised."}\n\nReply with the account path and approve — or \`internal\` (own dictation) or \`none\` (a casual contact, not an account); both file it and it never comes back.`,
         action: { type: "set-frontmatter", file: rel, field: keys.account } });
     }
+  }
+  // A question whose transcript was attached since (by hand, by an earlier
+  // answer, or just now) or is gone has answered itself. Only the ones still
+  // waiting keep theirs.
+  if (!dryRun && ctx.config.inbox?.fromLink !== false) {
+    out.closed = await resolveStale(ctx, "link", out.open.map((o) => `l${hashPart(`${ctx.config.transcripts.inbox}/${o.file}`)}`));
   }
   return out;
 }
