@@ -257,7 +257,17 @@ export async function rotateLog(file, max = 2 * 1024 * 1024) {
  * failed, or when it has never written a status at all — a job that exits 0
  * without touching its status is skipping on purpose (the daily plan already
  * exists, say), and overwriting that would erase the morning's real result.
+ *
+ * One exception: when the status on disk is one we wrote ourselves, the job
+ * has no status of its own, so a clean run replaces it. Without this a single
+ * failed evening (GitHub unreachable) kept the job on "failed" through every
+ * good run after it.
  */
+const OURS = /\(the job (wrote no status|writes no status of its own)\)$/;
+async function wroteByRunner(file) {
+  try { return OURS.test(String(JSON.parse(await readFile(file, "utf8")).message ?? "")); } catch { return false; }
+}
+
 export async function runJob(ctx, name, { force = false } = {}) {
   const job = jobsOf(ctx).find((j) => j.name === name);
   if (!job) throw new Error(`no job named ${name}`);
@@ -287,7 +297,7 @@ export async function runJob(ctx, name, { force = false } = {}) {
   const wroteNothing = after <= before;
   const seconds = Math.round((Date.now() - started) / 1000);
   if (wroteNothing && code !== 0) await writeStatus(ctx, name, { result: "error", done: 0, failed: 1, message: `exit ${code} after ${seconds}s (the job wrote no status)` });
-  else if (wroteNothing && !before) await writeStatus(ctx, name, { result: "ok", done: 1, failed: 0, message: `exit 0 after ${seconds}s (the job writes no status of its own)` });
+  else if (wroteNothing && (!before || await wroteByRunner(statusFile))) await writeStatus(ctx, name, { result: "ok", done: 1, failed: 0, message: `exit 0 after ${seconds}s (the job writes no status of its own)` });
   // Started from a terminal, say how it went: most jobs talk to their log and
   // a tab that ends in silence looks like a tab where nothing happened.
   if (process.stdout.isTTY) {
