@@ -11,7 +11,8 @@
  * inbox and a human.
  */
 import { createInterface } from "node:readline";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { search, status } from "../core/search.mjs";
 import { account, accounts, canon } from "../core/brief.mjs";
@@ -25,6 +26,24 @@ import { postItem, listItems, reply as replyItem } from "../core/inbox.mjs";
 // Descriptions are written for an agent that has never seen this company:
 // when to use the tool, what comes back, what to do next.
 const VERSION = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8")).version;
+
+// A server lives as long as the agent session that started it, so it can outlive
+// a `git pull` of the engine. Modules it had loaded stay as they were; a module it
+// loads later comes from the new code and may ask for an export the old one never
+// had. That error names a file, not the cause, so we say the cause.
+const ENGINE = fileURLToPath(new URL("..", import.meta.url));
+export function engineStamp(root = ENGINE) {
+  let newest = 0;
+  for (const dir of ["bin", "core", "connectors", "mcp"]) {
+    let files = [];
+    try { files = readdirSync(join(root, dir)); } catch { continue; }
+    for (const f of files) if (f.endsWith(".mjs")) newest = Math.max(newest, statSync(join(root, dir, f)).mtimeMs);
+  }
+  return newest;
+}
+export const staleHint = (startedWith, now = engineStamp()) => now > startedWith
+  ? " — the engine was updated after this server started, so it runs a mix of old and new code. Reconnect the company-os MCP server (in Claude Code: /mcp) and call again."
+  : "";
 
 export const TOOLS = [
   { name: "account", description: "What is going on with one client, lead or partner. Give any part of the name (\"harper\", \"northwind\") or the folder path. Returns the status file (first sections, capped), who holds the ball, the pipeline row and recent log lines, open commitments, the last contact moment and the newest files. Use this before anything else about an account; use `full: true` only when the head is not enough.", inputSchema: { type: "object", properties: { account: { type: "string", description: "name fragment or folder path" }, full: { type: "boolean", default: false }, maxChars: { type: "number", default: 3000 } }, required: ["account"] } },
@@ -80,6 +99,7 @@ export async function callTool(ctx, db, name, args = {}) {
 export function serve(ctx, db) {
   const send = (msg) => process.stdout.write(JSON.stringify(msg) + "\n");
   const rl = createInterface({ input: process.stdin });
+  const startedWith = engineStamp();
   rl.on("line", async (line) => {
     if (!line.trim()) return;
     let req;
@@ -94,7 +114,7 @@ export function serve(ctx, db) {
       else if (method === "tools/list") reply({ tools: TOOLS });
       else if (method === "tools/call") {
         try { reply({ content: [{ type: "text", text: JSON.stringify(await callTool(ctx, db, params.name, params.arguments ?? {}), null, 2) }] }); }
-        catch (e) { reply({ content: [{ type: "text", text: `error: ${e.message}` }], isError: true }); }
+        catch (e) { reply({ content: [{ type: "text", text: `error: ${e.message}${staleHint(startedWith)}` }], isError: true }); }
       } else fail(-32601, `method not found: ${method}`);
     } catch (e) { fail(-32603, e.message); }
   });
