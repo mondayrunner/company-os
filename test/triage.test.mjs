@@ -1,12 +1,12 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, rmSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { cpSync, rmSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, utimesSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadContext } from "../core/config.mjs";
 import { openDb } from "../core/db.mjs";
-import { postItem, listItems, triageQueue, triageNext, triageAnswer } from "../core/inbox.mjs";
+import { postItem, listItems, reply, runApproved, triageQueue, triageNext, triageAnswer } from "../core/inbox.mjs";
 import { TOOLS, callTool } from "../mcp/server.mjs";
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "company");
@@ -157,4 +157,41 @@ test("MCP: inbox_next and inbox_answer run the round", async () => {
   assert.equal(r.results[0].status, "done");
   assert.match(readFileSync(join(root, "knowledge/pricing.md"), "utf8"), /^stage: won$/m);
   assert.equal(r.left.questions, (await triageQueue(ctx)).counts.questions);
+});
+
+test("a group with a member put off by its own id can still be answered", async () => {
+  for (const n of [1, 2, 3]) await checkItem("old-notes", "drift", `note ${n} is old`, null, "knowledge/pricing.md");
+  const full = (await triageQueue(ctx)).queue.find((e) => e.check === "old-notes");
+  await triageAnswer(ctx, { ref: full.ids[0], answer: "later" });
+  const shown = (await triageQueue(ctx)).queue.find((e) => e.check === "old-notes");
+  assert.equal(shown.size, 2);
+  const r = await triageAnswer(ctx, { ref: shown.ref, answer: "no" });
+  assert.deepEqual(r.results.map((x) => x.id).sort(), shown.ids.slice().sort());
+  assert.equal((await listItems(ctx)).find((i) => i.id === full.ids[0]).status, "open");
+});
+
+test("an approved item runs once, however many runners reach for it", async () => {
+  const { id } = await checkItem("once", "proposal", "log once", { type: "edit-markdown", file: STATUS, log: { line: "- exactly once" } });
+  await reply(ctx, id, "", { status: "approved" });
+  const runs = await Promise.all([runApproved(ctx, { only: id }), runApproved(ctx, { only: id }), runApproved(ctx, { only: id })]);
+  assert.equal(readFileSync(join(root, STATUS), "utf8").split("- exactly once").length - 1, 1);
+  assert.equal(runs.flat().filter((r) => r.ok).length, 1);
+  assert.equal((await listItems(ctx)).find((i) => i.id === id).status, "done");
+  assert.ok(!existsSync(join(root, "inbox", ".claims", `${id}.claim`)));
+});
+
+test("a claim held by a live runner blocks; one left by a dead runner is taken over", async () => {
+  const { id } = await checkItem("claimed", "proposal", "log claimed", { type: "edit-markdown", file: STATUS, log: { line: "- after the claim" } });
+  await reply(ctx, id, "", { status: "approved" });
+  const claimFile = join(root, "inbox", ".claims", `${id}.claim`);
+  mkdirSync(dirname(claimFile), { recursive: true });
+  writeFileSync(claimFile, "999 now\n");
+  const [busy] = await runApproved(ctx, { only: id });
+  assert.equal(busy.busy, true);
+  assert.equal((await listItems(ctx)).find((i) => i.id === id).status, "approved");
+  const old = new Date(Date.now() - 31 * 60e3);
+  utimesSync(claimFile, old, old);
+  const [ran] = await runApproved(ctx, { only: id });
+  assert.equal(ran.ok, true);
+  assert.match(readFileSync(join(root, STATUS), "utf8"), /- after the claim/);
 });
