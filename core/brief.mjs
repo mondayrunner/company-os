@@ -151,7 +151,8 @@ export async function account(ctx, db, ref, { maxChars = 3000, full = false } = 
   const h = makeHelpers(ctx, db, []);
   const needles = needlesOf(folder).map((w) => w.toLowerCase());
   const leads = p?.leads ? await h.pipelineLeads() : [];
-  const leadRow = leads.find((r) => h.matchFolder(clean(r[p.leads.who ?? "who"]), [folder]));
+  const all = accountFolders(ctx, db);
+  const leadRow = leads.find((r) => h.rowFolder(r, clean(r[p.leads.who ?? "who"]), all) === folder);
   const pipelineText = p?.file ? await h.read(p.file).catch(() => "") : "";
   const commitments = p?.commitments
     ? tableUnder(pipelineText, new RegExp(`^${p.commitments.heading}`, "i"), p.commitments.columns).filter((r) => h.matchFolder(clean(r[p.commitments.who ?? "who"]), [folder])).map((r) => Object.fromEntries(p.commitments.columns.map((c) => [c, clean(r[c])])))
@@ -187,11 +188,12 @@ export async function accounts(ctx, db, { side = null } = {}) {
   const folders = accountFolders(ctx, db).filter((f) => !wanted.length || wanted.includes(sideOf(ctx, f)));
   const h = makeHelpers(ctx, db, []);
   const leads = p?.leads ? await h.pipelineLeads() : [];
+  const all = accountFolders(ctx, db);
   const out = [];
   for (const folder of folders) {
     const raw = await readFile(ctx.path(`${folder}/${a.statusFile}`), "utf8").catch(() => null);
     const body = raw ? frontmatter(raw).body : "";
-    const lead = leads.find((r) => h.matchFolder(clean(r[p.leads.who ?? "who"]), [folder]));
+    const lead = leads.find((r) => h.rowFolder(r, clean(r[p.leads.who ?? "who"]), all) === folder);
     const t = touched(db, folder);
     out.push({
       account: folder,

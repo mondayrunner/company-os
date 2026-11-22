@@ -23,7 +23,7 @@
  *   ---
  *   body … / ## Reply … / ## Result …
  */
-import { mkdir, readdir, readFile, writeFile, rename } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile, rename, stat } from "node:fs/promises";
 import { join, dirname, basename, resolve, sep } from "node:path";
 import { realpathSync } from "node:fs";
 import { frontmatter, setFrontmatter, hashOf } from "./markdown.mjs";
@@ -321,6 +321,38 @@ export async function expireReports(ctx, { days = 7 } = {}) {
     closed.push(item.id);
   }
   return closed;
+}
+
+/**
+ * Move finished items out of the way: `done` items not written to for `days` go to
+ * `<inbox>/_done/<yyyy-mm>/`. The inbox folder is what every listing, the
+ * dashboard and the twin lookup in postItem read, and after a few months it is
+ * mostly history: thousands of files in one folder, and the index full of them.
+ *
+ * Only `done`. A `rejected` item is what keeps a finding silent (postItem looks
+ * for its twin in the flat folder), so it stays; `open`, `approved` and
+ * `failed` are still somebody's business. A `done` fingerprint is free by
+ * design, so moving it changes nothing about what gets posted next.
+ * `listItems` does not descend into `_done/`. Nothing is deleted.
+ */
+export async function archiveDone(ctx, { days = 14, now = Date.now() } = {}) {
+  const dir = inboxDir(ctx);
+  const cutoff = now - days * 864e5;
+  const moved = [];
+  for (const item of await listItems(ctx, { status: "done" })) {
+    const t = item.created ? Date.parse(item.created) : NaN;
+    if (!Number.isFinite(t)) continue;
+    // Closed recently counts as recent: the last write is when it was closed,
+    // and the dashboard shows what closed lately.
+    const last = Math.max(t, (await stat(item.path).catch(() => null))?.mtimeMs ?? 0);
+    if (last > cutoff) continue;
+    const month = new Date(t).toISOString().slice(0, 7);
+    const to = join(dir, "_done", month, basename(item.path));
+    await mkdir(dirname(to), { recursive: true });
+    await rename(item.path, to);
+    moved.push(item.id);
+  }
+  return moved;
 }
 
 /**

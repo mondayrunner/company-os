@@ -21,7 +21,7 @@ export default {
       const action = h.clean(r[p.leads.action ?? "action"]);
       if (!ball) ball = action.match(/^([A-Za-zÀ-ÿ]+)\s+[—-]\s+/)?.[1] ?? "";
       if (!ball) continue;
-      const f = h.matchFolder(who, all);
+      const f = h.rowFolder(r, who, all);
       if (!f) continue;
       const statusRel = `${f}/${a.statusFile}`;
       if (!(await h.exists(statusRel))) continue;

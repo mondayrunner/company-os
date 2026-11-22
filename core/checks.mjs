@@ -20,7 +20,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadConnectors, byKind, readLive } from "./connectors.mjs";
 import { clean, slug, tableUnder, hashOf } from "./markdown.mjs";
 import { writeStatus } from "./status.mjs";
-import { postItem, resolveStale, expireReports, reply, runApproved } from "./inbox.mjs";
+import { postItem, resolveStale, expireReports, archiveDone, reply, runApproved } from "./inbox.mjs";
 import { findBallLine } from "./markdown.mjs";
 
 const BUILTIN = join(dirname(fileURLToPath(import.meta.url)), "..", "checks");
@@ -60,6 +60,28 @@ export function matchFolder(name, folders) {
   return best;
 }
 
+/**
+ * The account folder a table row is about. A path in backticks wins
+ * (`leads/2026-01-15-acme-website/` or just the folder name): the human wrote
+ * down which folder, so no name has to be guessed. Without one, the best name
+ * match across *all* folders. Asking `matchFolder(who, [folder])` for one
+ * folder at a time says yes to the first row that shares a single word with
+ * it, so "Samuel van den Berg" became the row of "boatyard-vandenberg", and
+ * three folders with "globex" in their name all got the first Globex row.
+ */
+export function rowFolder(row, who, folders) {
+  const text = Object.values(row ?? {}).join(" ");
+  let best = null, at = Infinity;
+  for (const m of text.matchAll(/`([^`]+)`/g)) {
+    const parts = m[1].split("/").filter(Boolean);
+    for (const f of folders) {
+      const name = f.split("/").pop();
+      if (parts.includes(name) && m.index < at) { best = f; at = m.index; }
+    }
+  }
+  return best ?? matchFolder(who, folders);
+}
+
 export function makeHelpers(ctx, db, connectors) {
   const cache = new Map();
   const h = {
@@ -75,7 +97,7 @@ export function makeHelpers(ctx, db, connectors) {
     isDir: async (rel) => !!(await stat(ctx.path(rel)).catch(() => null))?.isDirectory(),
     list: async (rel) => (await readdir(ctx.path(rel)).catch(() => [])).filter((n) => !n.startsWith(".") && !n.startsWith("_")),
     suppressed: (line) => ctx.config.markers.some((m) => line.includes(m)),
-    matchFolder, clean,
+    matchFolder, rowFolder, clean,
     /** Account folders, grouped per side. */
     accountFolders: async () => {
       if (cache.has("accounts")) return cache.get("accounts");
@@ -187,6 +209,7 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
   let posted = 0;
   let closed = [];
   let autoApplied = [];
+  let archived = [];
   if (ctx.config.inbox?.fromChecks !== false) {
     // One fingerprint per finding: the same value decides whether an old item
     // closes and whether a new one is posted.
@@ -194,6 +217,9 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
     const ran = new Set(checks.filter((c) => !skipped.some((s) => s.check === c.name)).map((c) => c.name));
     closed = await resolveStale(ctx, "check", stamped.map((f) => f.fingerprint), { within: (item, text) => [...ran].some((name) => text.includes(`check \`${name}\``)) });
     closed = closed.concat(await expireReports(ctx));
+    // Opt-in twice: a number of days, and `brain-hygiene` in `inbox.autoApprove`.
+    // Not in a quiet run: the run summary is where the move is logged.
+    if (!quiet && ctx.config.inbox?.archiveDays && (ctx.config.inbox?.autoApprove ?? []).includes("brain-hygiene")) archived = await archiveDone(ctx, { days: ctx.config.inbox.archiveDays });
     const news = [], fresh = [], refreshed = [], auto = [];
     for (const f of stamped) {
       // A finding says what it is (drift by default), and can say what approving
@@ -218,11 +244,12 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
     // One summary per run that did something: what was made, what is new, what
     // closed. The human reads one item instead of counting tickets.
     autoApplied = auto;
-    if (!quiet && (news.length || fresh.length || closed.length || refreshed.length || auto.length)) {
+    if (!quiet && (news.length || fresh.length || closed.length || refreshed.length || auto.length || archived.length)) {
       const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
       const lines = [`Ran ${checks.length - skipped.length} checks (\`${job}\`). ${findings.length} finding${findings.length === 1 ? "" : "s"}, ${posted} new in the inbox, ${closed.length} closed on their own${refreshed.length ? `, ${refreshed.length} rewritten with an action` : ""}.`];
       if (news.length) lines.push("", "**Done by the checks**", ...news.map((f) => `- ${f.what}`));
       if (auto.length) lines.push("", "**Auto-approved (inbox.autoApprove)**", ...auto.map((f) => `- ${f.ok ? "✓" : "✗"} ${f.what.replace(/\n/g, " ").slice(0, 160)}`));
+      if (archived.length) lines.push("", "**Archived (brain-hygiene)**", `- ${archived.length} done item${archived.length === 1 ? "" : "s"} moved to \`_done/<yyyy-mm>/\` (not touched for ${ctx.config.inbox.archiveDays} days): ${archived.slice(0, 20).join(", ")}${archived.length > 20 ? ", …" : ""}`);
       if (fresh.length) lines.push("", "**New, waiting for you**", ...fresh.map((f) => `- ${f.kind === "proposal" ? "approve" : f.kind === "question" ? "answer" : "look"}: ${f.what.replace(/\n/g, " ").slice(0, 160)}`));
       if (closed.length) lines.push("", `**Closed on their own:** ${closed.length}`);
       await postItem(ctx, { kind: "report", from: "check", title: `Check run ${stamp}: ${news.length ? `${news.length} done, ` : ""}${posted} new, ${closed.length} closed`, fingerprint: `r${hashOf(`${job}|${stamp}`).slice(0, 7)}`, body: lines.join("\n") });
@@ -232,7 +259,7 @@ export async function runChecks(ctx, db, { live = true, only = null, job = "chec
   // zero work": silent-jobs must not read a quiet skip as a broken job.
   const ranCount = checks.length - skipped.length;
   await writeStatus(ctx, job, { result: errors ? "partial" : !ranCount && skipped.length ? "skipped" : "ok", done: ranCount, failed: errors, message: `${errors} errors, ${findings.length - errors} warnings, ${posted} new in inbox${closed.length ? `, ${closed.length} closed` : ""}`, findings: findings.length, inbox_new: posted, inbox_closed: closed.length, inbox_auto: autoApplied.length, drafts_trashed: autoApplied.filter((f) => f.auto === "draft-cleanup" && f.ok).length, report: file ? ctx.short(file) : null });
-  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted, closed: closed.length, auto: autoApplied.length, applied: autoApplied.map((f) => ({ type: f.auto, ok: f.ok, where: f.where, what: f.what, message: f.message })), trashed: autoApplied.filter((f) => f.auto === "draft-cleanup" && f.ok && f.trashed).map((f) => f.trashed) } };
+  return { findings, skipped, errors, warnings: findings.length - errors, report: file, checks: checks.map((c) => c.name), inbox: { posted, closed: closed.length, archived: archived.length, auto: autoApplied.length, applied: autoApplied.map((f) => ({ type: f.auto, ok: f.ok, where: f.where, what: f.what, message: f.message })), trashed: autoApplied.filter((f) => f.auto === "draft-cleanup" && f.ok && f.trashed).map((f) => f.trashed) } };
 }
 
 function renderReport(ctx, { date, checks, findings, skipped, errors }) {
@@ -256,6 +283,10 @@ function renderReport(ctx, { date, checks, findings, skipped, errors }) {
  *   "ball-line-sent" (drafts-vs-sent): an inward edit-markdown on one
  *   account's status file that replaces its one ball line with one other
  *   ball line, plus at most one dated line under a heading. Nothing else.
+ *
+ *   "brain-hygiene" (stale-accounts): a move-file of one account folder from
+ *   an open side to `checks.stale-accounts.parkSide`, keeping its name. The
+ *   same key lets `inbox.archiveDays` move done inbox items to `_done/`.
  */
 export function autoApprovable(ctx, f) {
   const allowed = ctx.config.inbox?.autoApprove ?? [];
@@ -272,6 +303,24 @@ export function autoApprovable(ctx, f) {
     if (a.log && (typeof a.log.line !== "string" || /\n/.test(a.log.line))) return false;
     const extra = Object.keys(a).filter((k) => !["type", "file", "replace", "log", "inward"].includes(k));
     return extra.length === 0;
+  }
+  if (f.auto === "brain-hygiene") {
+    // stale-accounts only: one account folder from an open side to the park
+    // side named in its own config, same folder name, nothing else. A rename
+    // inside the vault, undone by the reverse rename.
+    const acc = ctx.config.accounts ?? {};
+    const park = ctx.config.checks?.["stale-accounts"]?.parkSide;
+    if (f.check !== "stale-accounts" || !park) return false;
+    if (!(acc.sides ?? []).includes(park) || (acc.openSides ?? []).includes(park)) return false;
+    if (!a || a.type !== "move-file" || !a.inward || a.outward) return false;
+    const extra = Object.keys(a).filter((k) => !["type", "inward", "from", "to"].includes(k));
+    if (extra.length) return false;
+    const prefix = acc.root ? `${acc.root}/` : "";
+    const from = String(a.from ?? ""), to = String(a.to ?? "");
+    if ([from, to].some((p) => p.includes("..") || p.startsWith("/") || !p.startsWith(prefix))) return false;
+    const [side, name, ...more] = from.slice(prefix.length).split("/");
+    if (more.length || !name || !(acc.openSides ?? []).includes(side)) return false;
+    return to === `${prefix}${park}/${name}`;
   }
   if (f.auto === "draft-cleanup") {
     const opts = ctx.config.checks?.["drafts-vs-sent"] ?? {};

@@ -103,6 +103,8 @@ Built in: `markdown`, `status`, `metrics-http`, `stripe`, `trello`, `tasks-markd
 
 `checks/*.mjs`, plus your own in `<folder>/checks/`. Each returns findings `{ severity, where, line, what }`. company-os drops a finding on a line you already marked (`⚠️`, `SUPERSEDED`): your note wins. `silent-jobs` watches the jobs themselves, including the one that reports ok while doing nothing. That case went unnoticed here for four weeks.
 
+Three checks keep the vault itself tidy. `stale-accounts` flags an open account nobody wrote in for `days` (90); give it a `parkSide` and the finding becomes a proposal that moves the folder there. `duplicate-accounts` flags a status file in a folder outside the accounts root (`link.extraAccountDirs`) and a merged account that is still on an open side. `docs-vs-jobs` compares a `| Job |` table in your docs with `jobs` in the config, both ways. Put `brain-hygiene` in `inbox.autoApprove` and two of these run without asking: a stale account moves to the `parkSide`, and with `inbox.archiveDays` set every full check run moves `done` items not touched for that many days to `inbox/_done/<yyyy-mm>/`. Both are renames inside the vault; each move is in the inbox (the auto-approved item, the run summary). Rejected items stay where they are, because they are what keeps a finding silent. By hand: `company-os inbox archive --days 14`.
+
 ## Inbox
 
 Every finding and proposal is one markdown file in `inbox/`, fingerprinted so the same finding never lands twice. Approve and the brain applies it; reject and it stays quiet for good. The brain refuses outward actions by design.

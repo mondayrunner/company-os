@@ -18,7 +18,7 @@ export default {
     const matched = new Set();
     for (const r of rows) {
       const who = h.clean(r[p.leads.who ?? "who"]);
-      const f = h.matchFolder(who, all);
+      const f = h.rowFolder(r, who, all);
       if (!f) out.push({ severity: "warn", where: p.file, line: r._line, what: `lead "${who}" has no account folder`, text: Object.values(r).join(" ") });
       else matched.add(f);
     }
