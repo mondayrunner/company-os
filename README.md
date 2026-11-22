@@ -118,6 +118,25 @@ Every finding and proposal is one markdown file in `inbox/`, fingerprinted so th
 "checks": { "drafts-vs-sent": { "cleanupDrafts": true } }
 ```
 
+**Triage: the inbox as yes/no questions.** A hundred open items is a list nobody opens. Triage asks one question at a time, in the order where one answer clears the most:
+
+1. proposals and findings with a file edit ready to apply,
+2. questions with a best guess (a `link` question: yes files the recording under its first candidate),
+3. findings an agent would fix,
+4. questions that need a typed answer (yes only works with a reply),
+5. items the brain refuses as outward (only no closes them),
+6. reports, last; they expire by themselves anyway.
+
+Near-identical items are one question: same check, same kind of action, nothing per item to type. Recordings group by their best guess ("these 9 → this account?"). Each question says what each answer does before you give it: **yes** approves and runs it through the same executor as the dashboard, with the same refusals; **no** rejects, so the finding stays silent; **later** leaves it open and out of the queue for 12 hours. A group answer covers exactly the items that were shown: if one joined or closed since, the answer is refused and you get the question again. Nothing new can run: triage only approves and rejects what was already in the inbox.
+
+```bash
+company-os inbox triage                # y (or j) yes · n no · l later · Enter default · r reply first · d details · q quit
+company-os inbox triage --files-only   # run file edits now, leave agent runs approved for `inbox run`
+company-os inbox triage --list         # the queue as JSON, no questions asked
+```
+
+In an agent chat it is `inbox_next` and `inbox_answer` (see MCP); in the dashboard the **triage** button (or `t`) on the inbox page shows one card at a time with the counts left, keys `j`/`y`, `n`, `l`. There, agent runs start in the background like the ✓ button.
+
 ## Jobs
 
 ```json
@@ -139,7 +158,7 @@ Every finding and proposal is one markdown file in `inbox/`, fingerprinted so th
 claude mcp add company-os -e COMPANY_OS_ROOT=/path/to/your/folder -- company-os serve
 ```
 
-Reading: `account`, `accounts`, `canon`, `search`, `mail`, `finance`, `tasks`, `calendar`, `live`, `ticket`, `status`, `check`. Writing, reversible and logged: `todo`, `task_done`, `mail_draft`. Talking back: `inbox_post`, `inbox_list`.
+Reading: `account`, `accounts`, `canon`, `search`, `mail`, `finance`, `tasks`, `calendar`, `live`, `ticket`, `status`, `check`. Writing, reversible and logged: `todo`, `task_done`, `mail_draft`. Talking back: `inbox_post`, `inbox_list`, `inbox_reply`. Clearing the inbox with the human: `inbox_next` returns one question (`question`, what `yes` / `no` / `later` do, the `default`, and a `ref`); ask it, then `inbox_answer { ref, answer: yes|no|later, reply? }` with their answer and get the next one. An entry with `agent: true` starts one agent run per item on yes, minutes each; pass `run: "files"` to apply file edits now and leave agent runs approved for `company-os inbox run`.
 
 ## Dashboard
 

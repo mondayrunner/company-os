@@ -21,7 +21,7 @@ import { todo, taskDone, mailDraft } from "../core/actions.mjs";
 import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
 import { ticket } from "../core/ticket.mjs";
-import { postItem, listItems, reply as replyItem } from "../core/inbox.mjs";
+import { postItem, listItems, reply as replyItem, triageNext, triageAnswer } from "../core/inbox.mjs";
 
 // Descriptions are written for an agent that has never seen this company:
 // when to use the tool, what comes back, what to do next.
@@ -63,6 +63,8 @@ export const TOOLS = [
   { name: "inbox_post", description: "Talk back to the human: post a question, proposal or finding to the inbox. The human replies there; approval runs the item (from the dashboard at once, from the CLI via `company-os inbox run`).", inputSchema: { type: "object", properties: { kind: { type: "string", enum: ["question", "proposal", "drift", "report"] }, title: { type: "string" }, body: { type: "string" }, action: { type: "object", description: "optional: {type: edit-markdown|set-frontmatter|move-file|agent, …}" } }, required: ["title", "body"] } },
   { name: "inbox_list", description: "List inbox items, optionally by status (open, approved, rejected, done, failed).", inputSchema: { type: "object", properties: { status: { type: "string" } } } },
   { name: "inbox_reply", description: "Reply to an inbox item and/or change its status. Use status: rejected to close an item that needs no action (a report you've read, a finding already handled elsewhere); status: approved to mark a proposal accepted for `company-os inbox run` to execute. Never use this to mark an outward action as sent — that stays the human's job.", inputSchema: { type: "object", properties: { id: { type: "string" }, text: { type: "string", default: "" }, status: { type: "string", enum: ["open", "approved", "rejected", "done"] } }, required: ["id"] } },
+  { name: "inbox_next", description: "Clear the inbox as a yes/no conversation, one question at a time. Returns the next question (`next`) and what is left (`left`). `next.ref` is what you answer with; a group (`group: true`, `size`, `items`) is near-identical items one answer covers. `next.question` is the one line to ask the human, `yes` / `no` / `later` say what each answer does, `default` is the suggested answer, `needsReply: true` means yes only works with a typed reply, and `agent: true` means yes starts one agent run per item (minutes each). Ask the human, wait for their answer, then call `inbox_answer`. Never answer on the human's behalf.", inputSchema: { type: "object", properties: { reports: { type: "boolean", default: true, description: "include reports (last); false skips them, they expire on their own" }, includeLater: { type: "boolean", default: false, description: "also show items answered `later` in the last hours" } } } },
+  { name: "inbox_answer", description: "Answer the question `inbox_next` returned, with the human's own answer: yes = approve and run it (same executor and refusals as the dashboard; outward actions stay refused), no = reject (silenced), later = leave open (skips the queue for a while). `reply` is optional: on yes it is the value (another account path than the guess, the line to file) or steers the agent; on no/later it is kept as a note. A group ref answers exactly the items that were shown; if the group changed, this refuses and you ask again. `run: false` only approves (run later with `company-os inbox run` or the dashboard), `run: \"files\"` runs file edits now and leaves agent runs approved. Returns the result per item and the next question.", inputSchema: { type: "object", properties: { ref: { type: "string", description: "next.ref: an item id or a group ref (g-…)" }, answer: { type: "string", enum: ["yes", "no", "later"] }, reply: { type: "string" }, run: { description: "true (default) | false | \"files\"", anyOf: [{ type: "boolean" }, { type: "string", enum: ["files"] }] } }, required: ["ref", "answer"] } },
   { name: "status", description: "What is in the brain: counts, sources, latest runs.", inputSchema: { type: "object", properties: {} } },
 ];
 
@@ -91,6 +93,8 @@ export async function callTool(ctx, db, name, args = {}) {
     case "inbox_post": return postItem(ctx, { kind: args.kind ?? "question", from: "agent", title: args.title, body: args.body, action: args.action ?? null });
     case "inbox_list": return (await listItems(ctx, { status: args.status ?? null })).map(({ id, kind, from, created, status, title, action }) => ({ id, kind, from, created, status, title, action }));
     case "inbox_reply": { const it = await replyItem(ctx, args.id, args.text ?? "", { status: args.status ?? null }); return { id: it.id, status: it.status, reply: it.reply }; }
+    case "inbox_next": return triageNext(ctx, { reports: args.reports ?? true, includeLater: !!args.includeLater });
+    case "inbox_answer": return triageAnswer(ctx, { ref: args.ref ?? args.group ?? args.id, answer: args.answer, reply: args.reply ?? "", run: args.run ?? true });
     case "status": return status(db, ctx);
     default: throw new Error(`unknown tool ${name}`);
   }

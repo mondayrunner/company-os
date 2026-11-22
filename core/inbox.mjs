@@ -48,6 +48,18 @@ function looksOutward(ctx, text) {
   return new RegExp(`\\b(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "i").test(text);
 }
 
+/**
+ * Would applyAction refuse this item as outward? One function, so the triage
+ * queue can say "refused" before the human says yes, with the same rule.
+ * `inward: true` is a check vouching for its own action: it reads a mail or a
+ * recording and writes a status file, and the word "mail" in that sentence is
+ * not a request to send one. The hard line stays: the executor cannot reach out.
+ */
+function refusedOutward(ctx, item) {
+  const a = item.action;
+  return !!(a?.outward || (!a?.inward && looksOutward(ctx, `${a?.type ?? ""} ${a?.instruction ?? ""} ${item.title}`)) || (!a && looksOutward(ctx, item.reply || "")));
+}
+
 export const inboxDir = (ctx) => ctx.path(ctx.config.inbox?.dir ?? "inbox");
 
 export function parseItem(text, path) {
@@ -57,7 +69,7 @@ export function parseItem(text, path) {
   const reply = body.split(/^## Reply\s*$/m)[1]?.split(/^## Result\s*$/m)[0]?.trim() ?? "";
   const result = body.split(/^## Result\s*$/m)[1]?.trim() ?? "";
   const description = body.split(/^## Reply\s*$/m)[0].trim();
-  return { id: meta.id, kind: meta.kind, from: meta.from, created: meta.created, status: meta.status ?? "open", title: meta.title, where: meta.where ?? null, fingerprint: meta.fingerprint, action, description, reply, result, path };
+  return { id: meta.id, kind: meta.kind, from: meta.from, created: meta.created, status: meta.status ?? "open", title: meta.title, where: meta.where ?? null, fingerprint: meta.fingerprint, later: meta.later ?? null, action, description, reply, result, path };
 }
 
 export async function listItems(ctx, { status = null } = {}) {
@@ -122,9 +134,18 @@ function logLine(text, heading, line) {
   return re.test(text) ? text.replace(re, (m) => `${m.replace(/\n+$/, "")}\n\n${line}\n`) : `${text.trimEnd()}\n\n## ${heading}\n\n${line}\n`;
 }
 
-/** The newest line of the human's reply, without its timestamp. */
+/**
+ * The newest line of the human's reply, without its timestamp. `reply()` puts
+ * a new line at the top of the section, so the bottom line is the oldest one:
+ * taking it meant a second reply (a note, then the answer) filed the note.
+ * Stamped lines go by their stamp; a hand-typed file without stamps by its last line.
+ */
 function lastReplyLine(reply) {
-  return String(reply ?? "").split("\n").map((l) => l.replace(/^_[^_]*_\s*/, "").trim()).filter(Boolean).pop() ?? "";
+  const lines = String(reply ?? "").split("\n").map((l) => l.trim()).filter(Boolean)
+    .map((l) => ({ stamp: l.match(/^_(\d{4}-\d{2}-\d{2} \d{2}:\d{2})_/)?.[1] ?? null, text: l.replace(/^_[^_]*_\s*/, "").trim() })).filter((l) => l.text);
+  const stamped = lines.filter((l) => l.stamp);
+  if (stamped.length) return stamped.reduce((a, b) => (b.stamp > a.stamp ? b : a)).text;
+  return lines.pop()?.text ?? "";
 }
 
 // An id comes from a URL or a tool argument. It names a file under inbox/ and
@@ -167,10 +188,7 @@ function inside(ctx, rel) {
 async function applyAction(ctx, item) {
   const a = item.action;
   const instruction = item.reply || a?.instruction || "";
-  // `inward: true` is a check vouching for its own action: it reads a mail or a
-  // recording and writes a status file, and the word "mail" in that sentence is
-  // not a request to send one. The hard line stays: the executor cannot reach out.
-  if (a?.outward || (!a?.inward && looksOutward(ctx, `${a?.type ?? ""} ${a?.instruction ?? ""} ${item.title}`)) || (!a && looksOutward(ctx, instruction))) {
+  if (refusedOutward(ctx, item)) {
     return { ok: false, message: "refused: this looks like an outward action (send, publish, invoice). Do it by hand; the brain only edits its own files." };
   }
   if (!a) {
@@ -385,4 +403,231 @@ export async function indexInbox(ctx, db) {
   for (const i of items) { up.run(i.id, ctx.short(i.path), i.kind, i.from, i.created, i.status, i.title, i.action ? JSON.stringify(i.action) : null, new Date().toISOString()); seen.add(i.id); }
   for (const r of db.prepare("SELECT id FROM inbox").all()) if (!seen.has(r.id)) db.prepare("DELETE FROM inbox WHERE id = ?").run(r.id);
   return { items: items.length, open: items.filter((i) => i.status === "open").length };
+}
+
+/*
+ * Triage: the inbox as a yes/no conversation.
+ *
+ * A list of a hundred items is a list nobody opens. The queue asks one thing
+ * at a time, in the order where one answer clears the most: proposals that are
+ * ready to run, then questions with a best guess, then findings, then the ones
+ * that need typing, then reports. Near-identical items (same check, same kind
+ * of action, nothing per-item to type) are one entry, so one answer covers the
+ * group. Every entry says what yes, no and later do before anyone answers.
+ *
+ *   yes   = approve, and run it through runApproved (same executor, same refusals)
+ *   no    = reject: the finding is silenced, as a reject always is
+ *   later = leave it open; it skips the queue for `laterHours`
+ *
+ * Nothing here can do more than approving in the dashboard: an outward item is
+ * shown as refused and a yes on it does nothing.
+ */
+
+const TIERS = ["ready", "candidate", "finding", "reply", "refused", "report"];
+
+const oneLine = (s, n = 160) => { const t = String(s ?? "").replace(/\s+/g, " ").trim(); return t.length > n ? `${t.slice(0, n - 1)}…` : t; };
+
+/** The check that posted a finding, from the header line every check item starts with. */
+export const checkOf = (item) => item.description?.match(/check `([^`]+)`/)?.[1] ?? null;
+
+/** The candidates a question lists ("Candidates: `a` (…), `b` (…)"), best first. */
+export function candidatesOf(item) {
+  const line = item.description?.match(/^Candidates?:(.*)$/m)?.[1] ?? "";
+  return [...line.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+}
+
+/** Does approving need a value the human has to give (the reply is the value)? */
+function needsValue(item) {
+  const a = item.action;
+  if (!a) return item.kind === "question";
+  if (a.type === "edit-markdown") return !!a.appendReply;
+  if (a.type === "set-frontmatter") return !a.fields && (a.value == null || a.value === "");
+  return false;
+}
+
+/** Approving this starts an agent run (minutes, costs money), not a file edit. */
+export const runsAgent = (item) => item.kind !== "report" && (!item.action || item.action.type === "agent");
+
+/** What the item says beyond its title: the first lines that are not the check header. */
+function detailOf(item) {
+  const lines = String(item.description ?? "").split("\n").map((l) => l.replace(/^>\s?/, "").trim())
+    .filter((l) => l && !/^\*\*\w+\*\* · check `/.test(l) && !/^Candidates?:/.test(l) && !/^Reply with /.test(l))
+    // A check's title is its finding cut at 120 characters: the same line twice says nothing.
+    .filter((l) => !String(item.title ?? "").startsWith(l.slice(0, 60)));
+  return oneLine(lines.slice(0, 2).join(" — "), 280);
+}
+
+/** In words, what a yes does to this item. `value` is what the reply would be. */
+function yesEffect(item, value = null) {
+  const a = item.action;
+  if (item.kind === "report") return "mark it read (done)";
+  if (!a) return item.kind === "question"
+    ? "an agent acts on your reply (files under the root only)"
+    : "an agent fixes what the finding describes (files under the root only, no shell, no network; it stops when a human has to decide)";
+  switch (a.type) {
+    case "set-frontmatter": {
+      const fields = a.fields ?? { [a.field]: a.value || value || "<your reply>" };
+      return `set ${Object.entries(fields).map(([k, v]) => `${k}: ${v}`).join(", ")} in ${a.file}`;
+    }
+    case "edit-markdown": {
+      const parts = [];
+      if (a.replace?.length) parts.push(`replace ${a.replace.length} passage${a.replace.length === 1 ? "" : "s"}`);
+      if (a.log?.line) parts.push(`log "${oneLine(a.log.line, 80)}"`);
+      if (a.appendReply) parts.push("file your reply as a dated line");
+      if (a.append) parts.push("append a line");
+      return `${parts.join(", ") || "edit"} in ${a.file}`;
+    }
+    case "move-file": return `move ${a.from} → ${a.to}`;
+    case "trash-draft": return `move the draft${a.expect?.subject ? ` "${oneLine(a.expect.subject, 60)}"` : ""} to Trash (not deleted)`;
+    case "agent": return `an agent does: ${oneLine(a.instruction, 160)}`;
+    default: return `nothing: unknown action type ${a.type}, approving will fail`;
+  }
+}
+
+function classify(ctx, item) {
+  const candidates = candidatesOf(item);
+  if (item.kind === "report") return { tier: "report", candidates };
+  if (refusedOutward(ctx, item)) return { tier: "refused", candidates };
+  if (needsValue(item)) return { tier: candidates.length && item.action ? "candidate" : "reply", candidates };
+  // Ready: a proposal with an action, or any finding whose action is a file
+  // edit the engine does itself (no agent, nothing to type).
+  if (item.action && (item.kind === "proposal" || item.action.type !== "agent")) return { tier: "ready", candidates };
+  return { tier: "finding", candidates };
+}
+
+/**
+ * The key that makes items one entry. Only items whose yes does the same kind
+ * of thing without anything per item to type: a question waiting for a typed
+ * answer, or a refused item, stands alone. Questions with a best guess group
+ * by that guess ("these 9 recordings → account X"), never across guesses.
+ */
+function groupKey(item, c) {
+  const check = checkOf(item);
+  if (c.tier === "reply" || c.tier === "refused") return `one|${item.id}`;
+  if (c.tier === "report") return `report|${item.from}|${check ?? ""}`;
+  if (c.tier === "candidate") return `cand|${item.from}|${item.action.type}|${item.action.field ?? ""}|${c.candidates[0]}`;
+  if (!check && item.from !== "check") return `one|${item.id}`;
+  return `${c.tier}|${item.from}|${check ?? ""}|${item.kind}|${item.action?.type ?? "none"}`;
+}
+
+function entryFor(members) {
+  const [first] = members;
+  const { tier, candidates } = first.c;
+  const candidate = tier === "candidate" ? candidates[0] : null;
+  const group = members.length > 1;
+  const ids = members.map((m) => m.item.id);
+  const check = checkOf(first.item);
+  const source = check ? `check \`${check}\`` : first.item.from;
+  const title = oneLine(first.item.title, 140);
+  // The title is the finding as the check wrote it, often cut mid-quote, so the
+  // ask goes after a dash instead of a question mark glued to its last word.
+  const verb = first.item.action && first.item.action.type !== "agent" ? "apply" : "fix it";
+  const ask = (t, v) => (/[?]$/.test(t) ? t : `${t} — ${v}?`);
+  let question;
+  if (tier === "report") question = group ? `${members.length} reports from ${source}, newest: ${title}. Mark them read?` : `Report: ${title}. Mark it read?`;
+  else if (tier === "candidate") question = group ? `${members.length} × ${oneLine(first.item.title, 80).replace(/\?$/, "")} (${source}) — all \`${candidate}\`?` : `${oneLine(first.item.title, 100).replace(/\?$/, "")} — \`${candidate}\`?`;
+  else if (tier === "refused") question = `${title} (refused: outward, do it by hand). Close it?`;
+  else if (tier === "reply") question = ask(title, "your answer");
+  else question = group ? `${members.length} similar from ${source}: ${title} (and ${members.length - 1} more) — ${verb === "apply" ? "apply all" : "yes to all"}?` : ask(title, verb);
+  const yes = tier === "refused" ? "nothing: this looks outward (send, publish, invoice) and the brain refuses it; say no to close it"
+    : tier === "reply" ? `needs a reply first: ${yesEffect(first.item)}`
+    : group ? `for each of the ${members.length}: ${first.item.action?.file ? yesEffect(first.item, candidate).replaceAll(first.item.action.file, "its file") : yesEffect(first.item, candidate)}${runsAgent(first.item) ? ` (${members.length} agent runs)` : ""}`
+    : yesEffect(first.item, candidate);
+  const filing = first.item.kind === "question" && first.item.action?.type === "set-frontmatter";
+  const no = tier === "report" ? "close it as rejected" : filing ? "reject: the question is silenced and the file stays unlinked; reply `none` with yes instead to file it as not an account" : "reject: silenced, the same finding does not come back";
+  return {
+    ref: group ? `g-${hashOf(ids.slice().sort().join("|")).slice(0, 10)}` : first.item.id,
+    group, size: members.length, ids, tier, kind: first.item.kind, from: first.item.from, check,
+    question, detail: group ? null : detailOf(first.item),
+    candidate, candidates: group ? [] : candidates,
+    default: ["reply", "refused"].includes(tier) ? "later" : "yes",
+    needsReply: tier === "reply", agent: runsAgent(first.item),
+    yes, no, later: "leave it open; it skips the queue for a while",
+    items: members.map(({ item }) => ({ id: item.id, title: oneLine(item.title, 140), where: item.where, created: item.created, detail: group ? detailOf(item) : undefined })),
+  };
+}
+
+/**
+ * The open items as a queue of yes/no questions, the ones one answer clears
+ * most of first. `reports: false` leaves reports out (they expire on their
+ * own). An item answered `later` stays out for `laterHours` unless
+ * `includeLater`. Returns the queue and the counts of what is left.
+ */
+export async function triageQueue(ctx, { reports = true, includeLater = false, laterHours = 12, now = Date.now(), items = null } = {}) {
+  const open = (items ?? await listItems(ctx, { status: "open" })).filter((i) => i.status === "open");
+  const snoozed = (i) => i.later && now - Date.parse(i.later) < laterHours * 36e5;
+  const groups = new Map();
+  let later = 0, skippedReports = 0;
+  for (const item of open) {
+    if (!includeLater && snoozed(item)) { later++; continue; }
+    const c = classify(ctx, item);
+    if (c.tier === "report" && !reports) { skippedReports++; continue; }
+    const key = groupKey(item, c);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ item, c });
+  }
+  const queue = [...groups.values()].map((m) => entryFor(m.sort((a, b) => String(a.item.created).localeCompare(String(b.item.created)))));
+  queue.sort((a, b) => (TIERS.indexOf(a.tier) - TIERS.indexOf(b.tier)) || (b.size - a.size) || String(a.items[0].created).localeCompare(String(b.items[0].created)));
+  const byTier = Object.fromEntries(TIERS.map((t) => [t, queue.filter((e) => e.tier === t).reduce((n, e) => n + e.size, 0)]).filter(([, n]) => n));
+  return { queue, counts: { questions: queue.length, items: queue.reduce((n, e) => n + e.size, 0), open: open.length, later, reports: skippedReports, byTier } };
+}
+
+/** The next question, and how many are left. */
+export async function triageNext(ctx, opts = {}) {
+  const { queue, counts } = await triageQueue(ctx, opts);
+  return { next: queue[0] ?? null, left: counts };
+}
+
+/**
+ * Answer one entry: `ref` is an item id or a group ref from the queue. A group
+ * ref is the hash of exactly the ids that were shown, so if the group changed
+ * since (a new item joined, one closed) the answer is refused rather than
+ * applied to items nobody saw. An item id inside a group answers that item only.
+ *
+ * `reply` is optional text. On yes it is the value (an account path instead
+ * of the guess, the line to file) or steers the agent; on no and later it is
+ * kept as a note. `run`: true runs approved items now, "files" runs only the
+ * ones that edit files and leaves agent runs approved, false only approves.
+ */
+export async function triageAnswer(ctx, { ref, answer, reply: text = "", run = true, now = Date.now() } = {}) {
+  if (!["yes", "no", "later"].includes(answer)) throw new Error(`answer must be yes, no or later, not ${answer}`);
+  if (!ref) throw new Error("ref required: an item id or a group ref from inbox_next");
+  const open = await listItems(ctx, { status: "open" });
+  let entry = (await triageQueue(ctx, { includeLater: true, items: open, now })).queue.find((e) => e.ref === ref);
+  if (!entry && !String(ref).startsWith("g-")) {
+    const item = open.find((i) => i.id === ref);
+    if (item) entry = entryFor([{ item, c: classify(ctx, item) }]);
+  }
+  if (!entry) throw new Error(String(ref).startsWith("g-") ? `group ${ref} changed or is gone — ask for the next question again` : `no open item ${ref}`);
+  text = String(text ?? "").trim();
+  const results = [];
+  for (const id of entry.ids) {
+    const item = open.find((i) => i.id === id);
+    if (answer === "later") {
+      const { file, text: old } = await itemFile(ctx, id);
+      let out = setFrontmatter(old, { later: new Date(now).toISOString() });
+      if (text) out = appendUnder(out, "Reply", `_${new Date(now).toISOString().slice(0, 16).replace("T", " ")}_ ${text}`);
+      await writeFile(file, out);
+      results.push({ id, status: "open", ok: true, message: "left open" });
+    } else if (answer === "no") {
+      const r = await reply(ctx, id, text, { status: "rejected" });
+      results.push({ id, status: r.status, ok: true, message: "rejected" });
+    } else if (entry.tier === "report") {
+      const r = await reply(ctx, id, text, { status: "done" });
+      results.push({ id, status: r.status, ok: true, message: "read" });
+    } else if (entry.tier === "refused") {
+      results.push({ id, status: "open", ok: false, message: "refused: this looks outward; do it by hand, or answer no to close it" });
+    } else {
+      const value = text || entry.candidate || "";
+      if (entry.needsReply && !value) { results.push({ id, status: "open", ok: false, message: `needs a reply: ${yesEffect(item)}` }); continue; }
+      await reply(ctx, id, value, { status: "approved" });
+      if (run === true || (run === "files" && !runsAgent(item))) {
+        const [r] = await runApproved(ctx, { only: id });
+        const status = r?.skip ? "open" : r?.ok ? "done" : "failed";
+        results.push({ id, status, ok: !!r?.ok, message: r?.message ?? "nothing ran", ...(r?.cost ? { cost: r.cost } : {}) });
+      } else results.push({ id, status: "approved", ok: true, message: runsAgent(item) ? "approved; the agent run is left for `inbox run`" : "approved, not run yet" });
+    }
+  }
+  const { queue, counts } = await triageQueue(ctx, { now });
+  return { ref, answer, results, next: queue[0] ?? null, left: counts };
 }

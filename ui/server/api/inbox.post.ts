@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import { join } from "node:path"
+import * as running from "#core/running.mjs"
 
 // Post, reply, approve, reject, clear or run. `run` executes approved items through the CLI
 // (files under the root only; outward actions are refused by company-os itself).
@@ -31,48 +32,26 @@ export default defineEventHandler(async (event) => {
     return { ok: true, result: { closed: closed.length } }
   }
 
+  // Triage: one answer (yes/no/later) to one queue entry, which may be a group.
+  // File edits run here and now, they take milliseconds. Agent runs take
+  // minutes, so they are left approved and handed to the same background run
+  // the ✓ button starts: one item by id, a group as "all approved".
+  if (action === "answer") {
+    const { triageAnswer } = await import("#core/inbox.mjs")
+    const { ref, answer } = body
+    if (!ref || !["yes", "no", "later"].includes(answer)) throw createError({ statusCode: 400, statusMessage: "ref and answer (yes|no|later) required" })
+    let r: any
+    try { r = await triageAnswer(ctx(), { ref, answer, reply: text ?? "", run: "files" }) }
+    catch (e: any) { return { ok: false, error: e?.message ?? "failed" } }
+    const waiting = r.results.filter((x: any) => x.status === "approved").map((x: any) => x.id)
+    let run: any = null
+    if (waiting.length) run = startRun(ctx(), waiting.length === 1 ? waiting[0] : null)
+    return { ok: true, result: { ...r, run } }
+  }
+
   if (!["reply", "approve", "reject", "run"].includes(action)) throw createError({ statusCode: 400, statusMessage: "unknown action" })
 
-  if (action === "run") {
-    const { start, finish, list, record } = await import("#core/running.mjs")
-    const context = ctx()
-    // Running everything while a single run is still going would hand the same
-    // approved item to two executors; an `agent` action would then run twice.
-    if (!id && list(context).length) return { ok: false, error: "a run is already going — wait for it before running all" }
-    const key = id ?? "all"
-
-    // Already going: say so instead of starting a second one on the same item.
-    if (list(context).some((r: any) => r.item === key)) return { ok: true, running: true, already: true }
-
-    const bin = join(context.lib, "bin", "company-os.mjs")
-    const child = spawn(process.execPath, [bin, "inbox", "run", ...(id ? ["--id", String(id)] : [])], {
-      cwd: context.root,
-      env: { ...process.env, COMPANY_OS_ROOT: context.root },
-      stdio: ["ignore", "pipe", "pipe"],
-    })
-
-    // Kept only to read the result off: the item's own file is where it lands.
-    let out = ""
-    child.stdout?.on("data", (b) => { out += b.toString().slice(0, 4000) })
-
-    start(context, key, { pid: child.pid, what: id ? "inbox run" : "inbox run (all approved)" })
-    child.on("exit", (code) => {
-      finish(context, key)
-      let done = 0, failed = 0, cost = null
-      try {
-        const rows = JSON.parse(out.slice(out.search(/[[{]/)))
-        for (const r of [].concat(rows)) { r.ok ? done++ : failed++; if (r.cost) cost = (cost ?? 0) + r.cost }
-      } catch { failed = code === 0 ? 0 : 1 }
-      record(context, { job: "inbox run", result: failed ? (done ? "partial" : "error") : "ok", done, failed,
-        message: id ? String(id) : "all approved", cost })
-    })
-    child.on("error", (e) => {
-      finish(context, key)
-      record(context, { job: "inbox run", result: "error", done: 0, failed: 1, message: e.message })
-    })
-
-    return { ok: true, running: true, pid: child.pid }
-  }
+  if (action === "run") return startRun(ctx(), id ?? null)
 
   try {
     return { ok: true, result: await cli(["inbox", action, String(id), ...(text ? [text] : [])]) }
@@ -81,3 +60,45 @@ export default defineEventHandler(async (event) => {
     return { ok: false, error: (e?.stderr || e?.message || "").toString().slice(0, 400) }
   }
 })
+
+// Start `inbox run` in the background for one item, or for every approved item
+// when `id` is null. Shared by the ✓ button and the triage answer.
+function startRun(context: any, id: string | null) {
+  const { start, finish, list, record } = running
+  // Running everything while a single run is still going would hand the same
+  // approved item to two executors; an `agent` action would then run twice.
+  if (!id && list(context).length) return { ok: false, error: "a run is already going — wait for it before running all" }
+  const key = id ?? "all"
+
+  // Already going: say so instead of starting a second one on the same item.
+  if (list(context).some((r: any) => r.item === key)) return { ok: true, running: true, already: true }
+
+  const bin = join(context.lib, "bin", "company-os.mjs")
+  const child = spawn(process.execPath, [bin, "inbox", "run", ...(id ? ["--id", String(id)] : [])], {
+    cwd: context.root,
+    env: { ...process.env, COMPANY_OS_ROOT: context.root },
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+
+  // Kept only to read the result off: the item's own file is where it lands.
+  let out = ""
+  child.stdout?.on("data", (b) => { out += b.toString().slice(0, 4000) })
+
+  start(context, key, { pid: child.pid, what: id ? "inbox run" : "inbox run (all approved)" })
+  child.on("exit", (code) => {
+    finish(context, key)
+    let done = 0, failed = 0, cost = null
+    try {
+      const rows = JSON.parse(out.slice(out.search(/[[{]/)))
+      for (const r of [].concat(rows)) { r.ok ? done++ : failed++; if (r.cost) cost = (cost ?? 0) + r.cost }
+    } catch { failed = code === 0 ? 0 : 1 }
+    record(context, { job: "inbox run", result: failed ? (done ? "partial" : "error") : "ok", done, failed,
+      message: id ? String(id) : "all approved", cost })
+  })
+  child.on("error", (e) => {
+    finish(context, key)
+    record(context, { job: "inbox run", result: "error", done: 0, failed: 1, message: e.message })
+  })
+
+  return { ok: true, running: true, pid: child.pid }
+}

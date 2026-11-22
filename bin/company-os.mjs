@@ -22,7 +22,7 @@
  *   boards [--create]         the boards this brain expects, made if you ask
  *   check [--no-live] [--only a,b] [--job name] [--quiet]  deterministic checks, report and inbox items (--quiet: no report file, no run summary)
  *   link [--dry-run]          attach waiting transcripts to accounts
- *   inbox list|show|post|reply|approve|reject|clear|run|archive   where agents talk back and you answer
+ *   inbox list|show|post|reply|approve|reject|clear|run|archive|triage   where agents talk back and you answer
  *   snapshot | event <file>   daily metrics; record one job run
  *
  * Running it
@@ -49,7 +49,7 @@ import { runChecks } from "../core/checks.mjs";
 import { loadConnectors, byKind } from "../core/connectors.mjs";
 import { ticket, tickets } from "../core/ticket.mjs";
 import { boards } from "../core/boards.mjs";
-import { postItem, listItems, reply, runApproved, clearOpen, archiveDone } from "../core/inbox.mjs";
+import { postItem, listItems, reply, runApproved, clearOpen, archiveDone, triageQueue, triageAnswer } from "../core/inbox.mjs";
 import { serve } from "../mcp/server.mjs";
 import { install, uninstall, runJob, listJobs } from "../core/jobs.mjs";
 import { init, nextSteps } from "../core/init.mjs";
@@ -149,7 +149,12 @@ try {
       else if (sub === "clear") { const closed = await clearOpen(ctx, { kind: flags.kind ?? null }); await indexAll(ctx, db, { only: ["markdown"] }); out({ closed: closed.length, ids: closed }); }
       else if (sub === "run") { out(await runApproved(ctx, { only: flags.id ?? null })); await indexAll(ctx, db, { only: ["markdown"] }); }
       else if (sub === "archive") { const days = Number(flags.days ?? ctx.config.inbox?.archiveDays ?? 14); const moved = await archiveDone(ctx, { days }); out({ archived: moved.length, days, to: "_done/<yyyy-mm>/" }); }
-      else { console.error("inbox: list | post | reply | approve | reject | show | clear | run | archive [--days N]"); process.exit(1); }
+      else if (sub === "triage") {
+        const run = flags["no-run"] ? false : flags["files-only"] ? "files" : true;
+        if (flags.list || !process.stdin.isTTY) { const q = await triageQueue(ctx, { reports: !flags["no-reports"] }); out(flags.json ? q : { left: q.counts, queue: q.queue.map((e) => ({ ref: e.ref, tier: e.tier, size: e.size, default: e.default, question: e.question, yes: e.yes })) }); }
+        else if (await triageTerminal(ctx, { reports: !flags["no-reports"], run })) await indexAll(ctx, db, { only: ["markdown"] });
+      }
+      else { console.error("inbox: list | post | reply | approve | reject | show | clear | run | archive [--days N] | triage [--list] [--no-reports] [--files-only|--no-run]"); process.exit(1); }
       break;
     }
     case "serve": await serve(ctx, db); break;
@@ -170,6 +175,45 @@ try {
     default: console.error(`unknown command: ${cmd}\n`); console.log(help()); process.exit(1);
   }
 } finally { db.close(); }
+
+/**
+ * `inbox triage`: the queue as a conversation in the terminal. One question at
+ * a time; y (or j) yes, n no, l later, Enter takes the default, r types a reply
+ * first, d shows the items, q stops. Returns how many answers were given.
+ */
+async function triageTerminal(ctx, { reports, run }) {
+  const { emitKeypressEvents, createInterface } = await import("node:readline");
+  const b = (s) => `\x1b[1m${s}\x1b[0m`, dim = (s) => `\x1b[2m${s}\x1b[0m`;
+  emitKeypressEvents(process.stdin);
+  const key = () => new Promise((res) => {
+    process.stdin.setRawMode(true); process.stdin.resume();
+    process.stdin.once("keypress", (str, k) => { process.stdin.setRawMode(false); process.stdin.pause(); res(k?.ctrl && k.name === "c" ? "q" : k?.name === "return" ? "enter" : (k?.name ?? str ?? "").toLowerCase()); });
+  });
+  const ask = (q) => new Promise((res) => { const rl = createInterface({ input: process.stdin, output: process.stdout }); rl.question(q, (a) => { rl.close(); res(a.trim()); }); });
+  let answered = 0;
+  for (;;) {
+    const { queue, counts } = await triageQueue(ctx, { reports });
+    const e = queue[0];
+    if (!e) { console.log(`\n${b("Inbox clear.")} ${counts.later ? `${counts.later} left for later. ` : ""}${answered} answered.`); return answered; }
+    console.log(`\n${dim(`${counts.questions} question${counts.questions === 1 ? "" : "s"}, ${counts.items} item${counts.items === 1 ? "" : "s"} left · ${e.tier}${e.group ? ` · ${e.size} items` : ""}${e.check ? ` · ${e.check}` : ` · ${e.from}`}`)}`);
+    console.log(b(e.question));
+    if (e.detail) console.log(dim(e.detail));
+    console.log(`  ${b("y")} yes    ${e.yes}${e.default === "yes" ? dim("  (Enter)") : ""}\n  ${b("n")} no     ${e.no}\n  ${b("l")} later  ${e.later}${e.default === "later" ? dim("  (Enter)") : ""}\n  ${dim("r reply first · d details · q quit")}`);
+    let k = await key(), text = "";
+    if (k === "d") { for (const i of e.items) console.log(dim(`  - ${i.id}${i.where ? ` · ${i.where}` : ""}\n    ${i.title}${i.detail ? `\n    ${i.detail}` : ""}`)); k = await key(); }
+    if (k === "r") { text = await ask(e.needsReply ? "reply (the value yes uses): " : "reply: "); if (!text) continue; console.log(dim("y yes · n no · l later")); k = await key(); }
+    if (k === "q") { console.log(`${answered} answered.`); return answered; }
+    const answer = k === "enter" ? e.default : k === "y" || k === "j" ? "yes" : k === "n" ? "no" : k === "l" ? "later" : null;
+    if (!answer) continue;
+    if (answer === "yes" && e.agent && run === true) console.log(dim(`running ${e.size} agent${e.size === 1 ? "" : "s"}, this takes minutes…`));
+    const r = await triageAnswer(ctx, { ref: e.ref, answer, reply: text, run });
+    answered++;
+    for (const x of r.results) console.log(`  ${x.ok ? "✓" : "✗"} ${x.id}: ${String(x.message).split("\n").pop().slice(0, 160)}`);
+    // A yes that did nothing (a reply is missing, the item is refused) leaves it
+    // first in line; say so instead of asking the same thing again in silence.
+    if (r.results.every((x) => !x.ok && x.status === "open")) console.log(dim("  still open: press r to reply, n to close, l for later"));
+  }
+}
 
 function help() {
   return `company-os — a company brain in markdown and SQLite
@@ -192,6 +236,7 @@ function help() {
   draft --to a --title s --file body.txt [--cc a] [--attach f.pdf …]   a draft in the mail client (never sends)
   boards [client name] [--create]   the boards this brain expects; shows the plan, --create makes what is missing
   inbox list|post|reply|approve|reject|show|clear|run|archive   agents talk back here; approved items get executed; archive moves old done items to _done/
+  inbox triage [--list] [--no-reports] [--files-only|--no-run]   clear the inbox one yes/no question at a time (y/n/l, Enter = default)
   serve                      MCP server over stdio for agents
   jobs list|install|uninstall|run <name> [--force]   schedule the config's jobs on launchd, cron or systemd; install/uninstall --only a,b for some; --force runs a job that would skip itself
   status                     what is in the brain

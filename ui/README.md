@@ -15,7 +15,7 @@ There is no fixed set of panels. A panel is a file in `app/components/panels/`, 
 
 Adding a panel, a connector, a check or a job: [../docs/extending.md](../docs/extending.md).
 
-Pages: `/` overview, `/inbox` answer and approve, `/activity` what ran, `/status` connectors and jobs.
+Pages: `/` overview, `/inbox` answer and approve (`/inbox?triage=1`: one yes/no card at a time), `/activity` what ran, `/status` connectors and jobs.
 
 ## Making it yours
 

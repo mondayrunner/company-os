@@ -9,6 +9,9 @@
  * deciding, the pane on the right is the whole item with the one gesture —
  * say what should happen and press Enter. ✓ takes the item as proposed, ✕
  * says no. For a batch of findings: x to select, then approve or reject all.
+ *
+ * Or none of that: `triage` (t, or ?triage=1) swaps the split view for one
+ * card at a time, a yes/no question with near-identical items folded together.
  */
 const { fmt } = useConfig()
 const { data, status, refresh } = useLazyFetch<any>("/api/inbox", { server: false })
@@ -69,6 +72,9 @@ function whereLink(where: string): string | null {
   const to = `/transcripts/${m[1]}`
   return router.resolve(to).matched.length ? to : null
 }
+// Triage mode lives in the URL too, so a link or a reload lands on the card.
+const triage = computed(() => route.query.triage === "1")
+function setTriage(on: boolean) { router.replace({ path: on ? "/inbox" : route.path, query: { ...route.query, triage: on ? "1" : undefined } }) }
 const openId = ref<string | null>(null)
 const current = computed(() => flat.value.find((i: any) => i.id === openId.value) ?? null)
 // The URL owns the selection: clicking pushes a query, the watcher follows it,
@@ -143,6 +149,8 @@ function move(step: number) {
 }
 
 function keys(e: KeyboardEvent) {
+  // The triage card has its own keys (j means yes there, not down).
+  if (triage.value) return
   const el = e.target as HTMLElement
   if (el?.tagName === "INPUT" || el?.tagName === "TEXTAREA") {
     if (e.key === "Escape") el.blur()
@@ -153,6 +161,7 @@ function keys(e: KeyboardEvent) {
   const k = e.key.toLowerCase()
   if (k === "j" || e.key === "ArrowDown") { e.preventDefault(); move(1) }
   else if (k === "k" || e.key === "ArrowUp") { e.preventDefault(); move(-1) }
+  else if (k === "t") { e.preventDefault(); setTriage(true) }
   else if (!item) return
   else if (k === "e" || e.key === "Enter") { e.preventDefault(); if (item.status === "open") document.getElementById("reply-box")?.focus() }
   else if (k === "x") { e.preventDefault(); toggleCheck(item.id) }
@@ -165,14 +174,17 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
 </script>
 
 <template>
-  <div class="h-full flex min-h-0">
+  <InboxTriage v-if="triage && content" :triage="content.triage" :running="running" @answered="refresh()" @close="setTriage(false)" />
+  <div v-else-if="triage" class="h-full flex items-center justify-center text-[13px] text-ink-3">{{ busy ? "…" : note ?? "Nothing waiting." }}</div>
+  <div v-else class="h-full flex min-h-0">
     <aside class="w-96 shrink-0 border-r border-line flex flex-col min-h-0">
       <div class="h-9 shrink-0 flex items-center gap-2 px-4 bg-header border-b border-line">
         <span class="text-[12px] font-semibold text-ink leading-none">Inbox</span>
         <button class="text-ink-3 hover:text-red transition-colors text-[11px] px-1 disabled:opacity-40" :disabled="busy" title="fetch again now" @click="refresh()"><span :class="busy && 'inline-block animate-spin'">↻</span></button>
         <span v-if="note" class="text-[11px] text-red truncate">{{ note }}</span>
         <button v-if="content?.open.length" class="text-[11px] px-2 py-0.5 rounded-full transition-colors disabled:opacity-40" :class="emptying ? 'bg-red text-white' : 'text-ink-3 ring-1 ring-line hover:text-ink'" :disabled="working === 'clear'" :title="emptying ? 'press again to close every open item as done; nothing is rejected, so a finding that is still true comes back' : 'close every open item'" @click="empty">{{ working === 'clear' ? "…" : emptying ? `close all ${content.open.length}?` : "empty" }}</button>
-        <span v-if="content" class="ml-auto text-[10px] px-2 py-0.5 rounded-full tabular font-semibold" :class="content.open.length ? 'bg-red text-white' : 'bg-card text-ink-3 ring-1 ring-line'">{{ content.open.length }} open</span>
+        <button v-if="content?.open.length" class="ml-auto text-[11px] px-2 py-0.5 rounded-full bg-ink text-card hover:opacity-80" title="one yes/no question at a time (t)" @click="setTriage(true)">triage</button>
+        <span v-if="content" class="text-[10px] px-2 py-0.5 rounded-full tabular font-semibold" :class="content.open.length ? 'bg-red text-white' : 'bg-card text-ink-3 ring-1 ring-line'">{{ content.open.length }} open</span>
       </div>
 
       <!-- Findings arrive in batches; deciding over a batch is one gesture. -->
@@ -240,7 +252,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", keys))
       </div>
       <div class="shrink-0 flex items-center gap-4 px-6 py-2 border-t border-line-soft bg-header text-[11px] text-ink-3">
         <span>Every item is a file in <code class="font-mono">inbox/</code>; rejecting silences that finding for good.</span>
-        <span class="ml-auto font-mono shrink-0">j/k move · enter type · a ✓ · r ✕ · x select</span>
+        <span class="ml-auto font-mono shrink-0">j/k move · enter type · a ✓ · r ✕ · x select · t triage</span>
       </div>
     </section>
     <div v-else class="grow flex items-center justify-center text-[13px] text-ink-3">{{ busy ? "…" : "Nothing waiting." }}</div>
